@@ -36,51 +36,60 @@ const StageInstruction: React.FC<{ stage: number; onStart: () => void }> = ({ st
 // 메인 캘리브레이션 컴포넌트
 interface CalibrationProps {
   onComplete: () => void;
-  // 3단계를 위해 liveGaze prop이 필요합니다.
   liveGaze: { x: number | null; y: number | null };
+  // --- 변경/추가 ---
+  // 3단계 성공률을 GazeTracker로 전달하기 위한 콜백 함수
+  onCalStage3Complete: (successRate: number) => void;
+  // --- 변경/추가 끝 ---
 }
 
-const Calibration: React.FC<CalibrationProps> = ({ onComplete, liveGaze }) => {
+const Calibration: React.FC<CalibrationProps> = ({ onComplete, liveGaze, onCalStage3Complete }) => {
   // --- 기존 상태 유지 및 확장 ---
-  // step 상태를 1, 2, 3단계로 확장
   const [step, setStep] = useState(1);
   const [dotIndex, setDotIndex] = useState(0);
   const [clickCount, setClickCount] = useState(0);
-  const CLICKS_PER_DOT = 3; // 점당 클릭 횟수
+  const CLICKS_PER_DOT = 3; 
 
-  // '안내'와 '실행' 모드를 전환하는 상태 추가 (기본값: true)
   const [isInstructionVisible, setIsInstructionVisible] = useState(true);
 
   // --- 1단계와 3단계(Smooth Pursuit)에 필요한 상태 추가 ---
   const [progress, setProgress] = useState(0);
   const [isGazeOnTarget, setIsGazeOnTarget] = useState(false);
   const animationFrameId = useRef<number | null>(null);
-
-   // liveGaze prop을 저장할 ref 생성
   const liveGazeRef = useRef(liveGaze);
-
   const dotRef = useRef<HTMLDivElement>(null);
 
-  // liveGaze prop이 바뀔 때마다 ref의 값을 업데이트하는 useEffect 추가
+  // --- 변경/추가 ---
+  // 3단계 성공률 추적을 위한 ref
+  const stage3FrameCount = useRef(0);
+  const stage3SuccessFrameCount = useRef(0);
+  // --- 변경/추가 끝 ---
+
+
   useEffect(() => {
     liveGazeRef.current = liveGaze;
   }, [liveGaze]);
 
   // --- 1단계와 3단계 로직 통합 ---
-  // 기존 SmoothPursuit 컴포넌트의 로직을 이곳으로 통합
   useEffect(() => {
-    // 1단계나 3단계가 아니면 useEffect 로직을 실행하지 않음
     if (isInstructionVisible || (step !== 1 && step !== 3)) return;
 
-    // 단계 시작 시 progress 초기화 및 예측 점 표시 설정
     setProgress(0);
-    window.webgazer.showPredictionPoints(step === 3); // 3단계에서만 예측 점 표시
+    window.webgazer.showPredictionPoints(step === 3); 
+
+    // --- 변경/추가 ---
+    // 3단계 시작 시 카운터 초기화
+    if (step === 3) {
+      stage3FrameCount.current = 0;
+      stage3SuccessFrameCount.current = 0;
+    }
+    // --- 변경/추가 끝 ---
 
     const dot = dotRef.current;
     if (!dot) return;
 
-    const DURATION = step === 1 ? 18000 : 20000; // 1단계는 18초, 3단계는 20초 (시간을 늘리면 점의 이동속도가 느려짐)
-    const DWELL_RADIUS_PX = 150;
+    const DURATION = step === 1 ? 18000 : 20000; 
+    const DWELL_RADIUS_PX = 150; // (GazeTracker.tsx의 CALIBRATION_DWELL_RADIUS와 일치시킬 것)
     let startTime: number;
 
     const animate = (timestamp: number) => {
@@ -89,7 +98,6 @@ const Calibration: React.FC<CalibrationProps> = ({ onComplete, liveGaze }) => {
       const currentProgress = Math.min(elapsedTime / DURATION, 1);
       setProgress(currentProgress);
 
-      // 경로 계산 (1단계는 원, 3단계는 리사주 곡선)
       const radiusX = window.innerWidth * (step === 1 ? 0.4 : 0.45);
       const radiusY = window.innerHeight * (step === 1 ? 0.4 : 0.45);
       const x = window.innerWidth / 2 + radiusX * Math.sin(currentProgress * Math.PI * 4);
@@ -98,8 +106,9 @@ const Calibration: React.FC<CalibrationProps> = ({ onComplete, liveGaze }) => {
       dot.style.left = `${x}px`;
       dot.style.top = `${y}px`;
 
-      // 3단계일 경우에만 데이터 정제 로직 실행s
       if (step === 3) {
+        stage3FrameCount.current += 1; // --- 변경/추가 --- (총 프레임 카운트)
+
         let isOnTarget = false;
         const currentGaze = liveGazeRef.current;
         if (currentGaze.x !== null && currentGaze.y !== null) {
@@ -109,10 +118,11 @@ const Calibration: React.FC<CalibrationProps> = ({ onComplete, liveGaze }) => {
         setIsGazeOnTarget(isOnTarget);
 
         if (isOnTarget) {
+          stage3SuccessFrameCount.current += 1; // --- 변경/추가 --- (성공 프레임 카운트)
           const mouseMoveEvent = new MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX: x, clientY: y });
           document.dispatchEvent(mouseMoveEvent);
         }
-      } else { // 1단계는 무조건 데이터 수집
+      } else { 
         const mouseMoveEvent = new MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX: x, clientY: y });
         document.dispatchEvent(mouseMoveEvent);
       }
@@ -120,7 +130,16 @@ const Calibration: React.FC<CalibrationProps> = ({ onComplete, liveGaze }) => {
       if (currentProgress < 1) {
         animationFrameId.current = requestAnimationFrame(animate);
       } else {
-        // 단계가 끝나면 다음 단계 '안내' 페이지를 보여줌
+        // --- 변경/추가 ---
+        // 3단계가 끝났으면 성공률을 부모 컴포넌트로 전달
+        if (step === 3) {
+          const successRate = stage3FrameCount.current > 0 
+            ? stage3SuccessFrameCount.current / stage3FrameCount.current 
+            : 0;
+          onCalStage3Complete(successRate);
+        }
+        // --- 변경/추가 끝 ---
+
         setStep(prev => prev + 1);
         setIsInstructionVisible(true);
       }
@@ -130,7 +149,7 @@ const Calibration: React.FC<CalibrationProps> = ({ onComplete, liveGaze }) => {
     return () => {
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
     };
-  }, [step, onComplete, isInstructionVisible]); // onComplete 유지????
+  }, [step, onComplete, isInstructionVisible, onCalStage3Complete]); // --- 변경/추가 --- (dependency 추가)
 
   // --- 기존 2단계 로직 유지 ---
   const handleDotClick = () => {
@@ -142,7 +161,6 @@ const Calibration: React.FC<CalibrationProps> = ({ onComplete, liveGaze }) => {
         setDotIndex(dotIndex + 1);
         setClickCount(0);
       } else {
-        // 2단계가 끝나면 다음 단계 '안내' 페이지를 보여줌
         setStep(prev => prev + 1);
         setIsInstructionVisible(true);
       }

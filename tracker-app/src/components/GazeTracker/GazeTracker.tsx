@@ -24,13 +24,9 @@ type QualitySetting = 'low' | 'medium' | 'high';
 // 회귀 모델 선택을 위한 타입과 상태 추가
 type RegressionModel = 'ridge' | 'threadedRidge' | 'weightedRidge';
 
-// --- 변경/추가 ---
 // A/B 테스트 및 로깅을 위한 파라미터 상수화
-// (이 값들을 변경하며 테스트 결과를 비교)
-const USE_KALMAN_FILTER = true; // 칼만 필터 사용 여부 (true/false)
-const CALIBRATION_DWELL_RADIUS = 150; // 캘리브레이션 3단계 민감도 (px)
-// (참고: CALIBRATION_DWELL_RADIUS 값은 Calibration.tsx의 DWELL_RADIUS_PX 값과 일치해야 합니다.)
-// --- 변경/추가 끝 ---
+const USE_KALMAN_FILTER = true; 
+const CALIBRATION_DWELL_RADIUS = 150; 
 
 
 const GazeTracker: React.FC = () => {
@@ -44,24 +40,25 @@ const GazeTracker: React.FC = () => {
   const taskStartTime = useRef<number | null>(null);
   const [validationError, setValidationError] = useState<number | null>(null);
   const validationGazePoints = useRef<{ x: number; y: number }[]>([]);
-  const [screenSize, setScreenSize] = useState<{ width: number; height: number } | null>(null); // 화면크기 기록 (화면 크기 대비 오차율 확인용) 
-  // quality 상태 추가, 기본값은 'medium'
+  const [screenSize, setScreenSize] = useState<{ width: number; height: number } | null>(null); 
   const [quality, setQuality] = useState<QualitySetting>('medium');
-  // 회기 모델 상태 추가
-  const [regressionModel, setRegressionModel] = useState<RegressionModel>('ridge'); // 기본값: ridge
-  // 실시간 시선 좌표를 저장할 state 추가
+  const [regressionModel, setRegressionModel] = useState<RegressionModel>('ridge'); 
   const [liveGaze, setLiveGaze] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
+
+  // --- 변경/추가 ---
+  // 2. 캘리브레이션 품질 지표 저장을 위한 state 추가
+  const [recalibrationCount, setRecalibrationCount] = useState(0);
+  const [gazeStability, setGazeStability] = useState<number | null>(null); // 시선 안정성 (표준편차)
+  const [calStage3SuccessRate, setCalStage3SuccessRate] = useState<number | null>(null); // 캘리브레이션 3단계 성공률
+  // --- 변경/추가 끝 ---
+
 
   // --- useEffect 훅 (Side Effects) ---
 
   // WebGazer.js 스크립트 로드
   useEffect(() => {
     const script = document.createElement('script');
-
-    //script.src = 'https://webgazer.cs.brown.edu/webgazer.js';
-    // CDN 주소 대신 로컬 경로로 변경
     script.src = '/webgazer.js';
-
     script.async = true;
     script.onload = () => setIsScriptLoaded(true);
     document.body.appendChild(script);
@@ -81,8 +78,13 @@ const GazeTracker: React.FC = () => {
   // 정확도 측정 로직
   useEffect(() => {
     if (gameState !== 'validating') return;
+    
+    // --- 변경/추가 ---
+    // 측정 시작 시 기존 안정성/오차 값 초기화
     validationGazePoints.current = [];
     setValidationError(null);
+    setGazeStability(null);
+    // --- 변경/추가 끝 ---
 
     const validationListener = (data: any) => {
       if (data) validationGazePoints.current.push({ x: data.x, y: data.y });
@@ -93,21 +95,38 @@ const GazeTracker: React.FC = () => {
       window.webgazer.clearGazeListener();
       if (validationGazePoints.current.length === 0) {
         alert("시선이 감지되지 않았습니다. 재보정을 진행합니다.");
-        handleRecalibrate();
+        handleRecalibrate(); // handleRecalibrate가 recalibrationCount를 증가시킴
         return;
       }
+
+      // --- 변경/추가 ---
+      // 1. 평균 계산 (기존 로직)
       const avgGaze = validationGazePoints.current.reduce(
         (acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }),
         { x: 0, y: 0 }
       );
       avgGaze.x /= validationGazePoints.current.length;
       avgGaze.y /= validationGazePoints.current.length;
+
+      // 2. 평균 오차 계산 (기존 로직)
       const target = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
       const error = Math.sqrt(Math.pow(target.x - avgGaze.x, 2) + Math.pow(target.y - avgGaze.y, 2));
       setValidationError(error);
+
+      // 3. 시선 안정성 (표준 편차) 계산
+      const sumSqDiffX = validationGazePoints.current.reduce((acc, p) => acc + Math.pow(p.x - avgGaze.x, 2), 0);
+      const sumSqDiffY = validationGazePoints.current.reduce((acc, p) => acc + Math.pow(p.y - avgGaze.y, 2), 0);
+      const stdDevX = Math.sqrt(sumSqDiffX / validationGazePoints.current.length);
+      const stdDevY = Math.sqrt(sumSqDiffY / validationGazePoints.current.length);
+      
+      // X, Y 표준편차의 평균을 시선 안정성 지표로 사용
+      const stability = (stdDevX + stdDevY) / 2;
+      setGazeStability(stability);
+      // --- 변경/추가 끝 ---
+
     }, 3000);
     return () => clearTimeout(timer);
-  }, [gameState]);
+  }, [gameState]); // handleRecalibrate가 useCallback으로 감싸져 있지 않다면 dependency list에 추가해야 할 수 있으나, 현재 구조에서는 괜찮음.
 
   // 과제용 랜덤 점 생성
   useEffect(() => {
@@ -159,8 +178,6 @@ const GazeTracker: React.FC = () => {
         }
       };
       window.webgazer.setGazeListener(gazeListener);
-
-      // 캘리브레이션 상태가 아니면 리스너 정리
       return () => window.webgazer.clearGazeListener();
     }
   }, [gameState]);
@@ -170,49 +187,31 @@ const GazeTracker: React.FC = () => {
 
   const handleStart = () => {
     setTaskResults([]);
-
-    setScreenSize({ width: window.innerWidth, height: window.innerHeight }); // 측정 시작 시점의 화면 크기를 저장
-
+    setScreenSize({ width: window.innerWidth, height: window.innerHeight }); 
     if (!isScriptLoaded) return;
     
-    window.webgazer.setTracker('TFFacemesh');// 얼굴 추적 모델을 설정. (clmtrackr(기본값) -> TFFacemesh)
-
-  /* // threadedRidge worker 설정
-   if (window.webgazer.params) {
-    window.webgazer.params.workerScriptPath = `${process.env.PUBLIC_URL}/webgazer.worker.js`;
-  }
-
-  // Fallback 설정 (환경별 호환성)
-  //if (window.webgazer.params && !window.webgazer.params.WORKER_PATH) {
-    window.webgazer.params.WORKER_PATH = `${process.env.PUBLIC_URL}/webgazer.worker.js`;
-  } */
-
-    window.webgazer.setRegression('ridge');// 회기 모델 변경 (ridge(기본값) -> threadedRidge(현재 오류 발생) or weightedRidge)
-
+    window.webgazer.setTracker('TFFacemesh');
+    window.webgazer.setRegression('ridge');
     collectedData.current = [];
-
     window.webgazer.begin();
-
-    // --- 변경 ---
-    // 상단에 정의한 USE_KALMAN_FILTER 상수를 사용하도록 수정
     window.webgazer.applyKalmanFilter(USE_KALMAN_FILTER); 
-    // --- 변경 끝 ---
+
+    // --- 변경/추가 ---
+    // 시작 시 재보정 횟수 및 관련 지표 초기화
+    setRecalibrationCount(0);
+    setGazeStability(null);
+    setValidationError(null);
+    setCalStage3SuccessRate(null);
+    // --- 변경/추가 끝 ---
 
     setGameState('webcamCheck');
   };
 
-  // WebcamCheck 화면에서 '캘리브레이션 시작'을 누르면 호출될 함수
   const handleCalibrationStart = () => {
     if (!window.webgazer) return;
-
-    // 현재 quality 상태에 맞는 카메라 설정을 적용
     const constraints = CAMERA_SETTINGS[quality];
     window.webgazer.setCameraConstraints({ video: constraints });
-
-    // 선택된 회귀 모델을 적용하는 코드 추가
     window.webgazer.setRegression(regressionModel);
-
-    // 캘리브레이션 상태로 전환
     setGameState('calibrating');
   };
 
@@ -220,10 +219,24 @@ const GazeTracker: React.FC = () => {
     setGameState('confirmValidation');
   }, [setGameState]);
 
+  // --- 변경/추가 ---
+  // 캘리브레이션 3단계 성공률을 받는 콜백 함수
+  const handleCalStage3Complete = useCallback((successRate: number) => {
+    setCalStage3SuccessRate(successRate);
+  }, []);
+  // --- 변경/추가 끝 ---
+
+
   const handleRecalibrate = () => {
     setValidationError(null);
+    setGazeStability(null); // --- 변경/추가 ---
     window.webgazer.clearData();
     setGameState('calibrating');
+    
+    // --- 변경/추가 ---
+    // 재보정 횟수 증가
+    setRecalibrationCount(prevCount => prevCount + 1);
+    // --- 변경/추가 끝 ---
   };
   
 
@@ -240,10 +253,8 @@ const GazeTracker: React.FC = () => {
 
     if (lastGazePos) { 
       if (targetPos) {
-        // 강제 어설션: lastGazePos 뒤에 ! 를 붙여 null이 아님을 명시
         gazeToTargetDistance = Math.sqrt(Math.pow(targetPos.x - lastGazePos.x!, 2) + Math.pow(targetPos.y - lastGazePos.y!, 2));
       }
-      // 강제 어설션: lastGazePos 뒤에 ! 를 붙여 null이 아님을 명시
       gazeToClickDistance = Math.sqrt(Math.pow(clickPos.x - lastGazePos.x!, 2) + Math.pow(clickPos.y - lastGazePos.y!, 2));
     }
 
@@ -258,8 +269,7 @@ const GazeTracker: React.FC = () => {
   };
 
   const downloadCSV = () => {
-    // --- 변경/추가 ---
-    // 1. 시스템 환경 메타데이터 (A/B 테스트 및 설정값 로깅)
+    // 1. 시스템 환경 메타데이터
     const systemMetaData = [
       `# --- System & Environment Settings ---`,
       `# Camera Quality: ${quality}`,
@@ -268,19 +278,22 @@ const GazeTracker: React.FC = () => {
       `# Calibration Dwell Radius (px): ${CALIBRATION_DWELL_RADIUS}`,
     ].join('\n');
 
-    // 2. 기존 측정 메타데이터 (측정 결과)
+    // --- 변경/추가 ---
+    // 2. 측정 메타데이터 (캘리브레이션 품질 지표 포함)
     const measurementMetaData = [
       `# --- Measurement Results ---`,
       `# Screen Size (width x height): ${screenSize ? `${screenSize.width}x${screenSize.height}` : 'N/A'}`,
+      `# Recalibration Count: ${recalibrationCount}`,
+      `# Calibration Stage 3 Success Rate: ${calStage3SuccessRate ? (calStage3SuccessRate * 100).toFixed(1) + '%' : 'N/A'}`,
       `# Validation Error (pixels): ${validationError ? validationError.toFixed(2) : 'N/A'}`,
+      `# Gaze Stability (Avg. StdDev px): ${gazeStability ? gazeStability.toFixed(2) : 'N/A'}`,
     ].join('\n');
+    // --- 변경/추가 끝 ---
 
     const header = 'timestamp,taskId,targetX,targetY,gazeX,gazeY,mouseX,mouseY';
     const rows = collectedData.current.map(d => `${d.timestamp},${d.taskId ?? ''},${d.targetX ?? ''},${d.targetY ?? ''},${d.gazeX ?? ''},${d.gazeY ?? ''},${d.mouseX ?? ''},${d.mouseY ?? ''}`).join('\n');
     
-    // 메타데이터와 헤더, 데이터를 조합하여 CSV 내용 구성
     const csvContent = `${systemMetaData}\n${measurementMetaData}\n\n${header}\n${rows}`;
-    // --- 변경/추가 끝 ---
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -299,14 +312,18 @@ const GazeTracker: React.FC = () => {
       case 'idle':
         return <Instructions onStart={handleStart} isScriptLoaded={isScriptLoaded} />;
       case 'webcamCheck':
-        // --- 변경/추가 ---
-        // (참고) USE_KALMAN_FILTER 값도 WebcamCheck 컴포넌트로 넘겨서
-        // 사용자가 UI에서 직접 켜고 끄도록 만들 수 있습니다. (지금은 상수 사용)
         return <WebcamCheck quality={quality} onQualityChange={setQuality} regressionModel={regressionModel} onRegressionChange={setRegressionModel}onComplete={handleCalibrationStart} />;
       case 'calibrating':
-        return <Calibration onComplete={handleCalibrationComplete} liveGaze={liveGaze} />;
+        // --- 변경/추가 ---
+        // 캘리브레이션 3단계 성공률 콜백 함수 전달
+        return <Calibration 
+                  onComplete={handleCalibrationComplete} 
+                  liveGaze={liveGaze} 
+                  onCalStage3Complete={handleCalStage3Complete} 
+                />;
+        // --- 변경/추가 끝 ---
       case 'confirmValidation':
-         return ( // 이 부분은 UI가 간단하여 별도 컴포넌트로 분리하지 않았습니다.
+         return ( 
           <div className="validation-container">
             <div className="confirmation-box">
               <h2>캘리브레이션 완료</h2>
@@ -316,7 +333,15 @@ const GazeTracker: React.FC = () => {
           </div>
         );
       case 'validating':
-        return <Validation validationError={validationError} onRecalibrate={handleRecalibrate} onStartTask={() => setGameState('task')} />;
+        // --- 변경/추가 ---
+        // 시선 안정성(gazeStability) 값도 Validation 컴포넌트로 전달 (표시용)
+        return <Validation 
+                  validationError={validationError} 
+                  gazeStability={gazeStability} // <-- 추가
+                  onRecalibrate={handleRecalibrate} 
+                  onStartTask={() => setGameState('task')} 
+                />;
+        // --- 변경/추가 끝 ---
       case 'task':
         return <Task taskCount={taskCount} currentDot={currentDot} onDotClick={handleTaskDotClick} />;
       case 'finished':
