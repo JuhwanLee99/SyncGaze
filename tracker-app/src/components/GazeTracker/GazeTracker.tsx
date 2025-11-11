@@ -54,15 +54,18 @@ const GazeTracker: React.FC = () => {
   const [avgGazeMouseDivergence, setAvgGazeMouseDivergence] = useState<number | null>(null);
   const [avgGazeTimeToTarget, setAvgGazeTimeToTarget] = useState<number | null>(null);
   
+  // --- 변경/추가 ---
+  // Results.tsx에서 계산하던 통계 2개를 GazeTracker state로 이동
+  const [avgClickTimeTaken, setAvgClickTimeTaken] = useState<number | null>(null);
+  const [avgGazeToClickError, setAvgGazeToClickError] = useState<number | null>(null);
+  // --- 변경/추가 끝 ---
+  
   // 각 과제의 시작 시간을 기록하기 위한 ref
   const taskStartTimes = useRef<Record<number, number>>({});
 
 
-  // --- 변경/추가 ---
   // --- 2. 이벤트 핸들러 (Event Handlers) ---
-  // (useEffect보다 먼저 선언되어야 참조 오류가 발생하지 않습니다)
 
-  // handleRecalibrate를 useCallback으로 감싸서 useEffect 의존성 문제 해결
   const handleRecalibrate = useCallback(() => {
     setValidationError(null);
     setGazeStability(null); 
@@ -70,7 +73,7 @@ const GazeTracker: React.FC = () => {
     setGameState('calibrating');
     
     setRecalibrationCount(prevCount => prevCount + 1);
-  }, []); // 의존성 없음 (state setter 함수는 보장됨)
+  }, []); 
 
   const handleCalibrationComplete = useCallback(() => {
     setGameState('confirmValidation');
@@ -98,6 +101,13 @@ const GazeTracker: React.FC = () => {
     setCalStage3SuccessRate(null);
     setAvgGazeMouseDivergence(null);
     setAvgGazeTimeToTarget(null);
+    
+    // --- 변경/추가 ---
+    // 신규 2개 state 초기화
+    setAvgClickTimeTaken(null);
+    setAvgGazeToClickError(null);
+    // --- 변경/추가 끝 ---
+
     taskStartTimes.current = {};
 
     setGameState('webcamCheck');
@@ -129,6 +139,7 @@ const GazeTracker: React.FC = () => {
       gazeToClickDistance = Math.sqrt(Math.pow(clickPos.x - lastGazePos.x!, 2) + Math.pow(clickPos.y - lastGazePos.y!, 2));
     }
 
+    // taskResults state에 저장 (이 데이터는 'finished' 상태에서 계산됨)
     setTaskResults(prevResults => [...prevResults, { taskId: taskCount + 1, timeTaken, gazeToTargetDistance, gazeToClickDistance }]);
 
     if (taskCount < TOTAL_TASKS - 1) {
@@ -139,6 +150,56 @@ const GazeTracker: React.FC = () => {
     }
   };
 
+  // --- 변경/추가 ---
+  // 3.1. 파생 데이터 계산 함수 (useCallback으로 감쌈)
+  const analyzeTaskData = useCallback(() => {
+    const data = collectedData.current;
+    if (data.length === 0) return;
+
+    // 3.1.1. 평균 시선-마우스 이격도
+    let lastMousePos = { x: 0, y: 0 };
+    const divergences: number[] = [];
+    for (const record of data) {
+      if (record.mouseX !== null && record.mouseY !== null) {
+        lastMousePos = { x: record.mouseX, y: record.mouseY };
+      }
+      if (record.gazeX !== null && record.gazeY !== null && lastMousePos.x !== 0) {
+        const dist = Math.sqrt(Math.pow(record.gazeX - lastMousePos.x, 2) + Math.pow(record.gazeY - lastMousePos.y, 2));
+        divergences.push(dist);
+      }
+    }
+    if (divergences.length > 0) {
+      const avgDivergence = divergences.reduce((a, b) => a + b, 0) / divergences.length;
+      setAvgGazeMouseDivergence(avgDivergence);
+    }
+
+    // 3.1.2. 평균 시선 반응 속도
+    const reactionTimes: number[] = [];
+    const GAZE_HIT_RADIUS = 100; 
+    for (let i = 1; i <= TOTAL_TASKS; i++) {
+      const startTime = taskStartTimes.current[i];
+      if (!startTime) continue;
+      const taskGazeEvents = data.filter(d => d.taskId === i && d.gazeX !== null && d.timestamp >= startTime);
+      if (taskGazeEvents.length === 0) continue;
+      const target = { x: taskGazeEvents[0].targetX, y: taskGazeEvents[0].targetY };
+      if (target.x === null || target.y === null) continue;
+      for (const event of taskGazeEvents) {
+        const dist = Math.sqrt(Math.pow(event.gazeX! - target.x, 2) + Math.pow(event.gazeY! - target.y, 2));
+        if (dist < GAZE_HIT_RADIUS) {
+          reactionTimes.push(event.timestamp - startTime); 
+          break; 
+        }
+      }
+    }
+    if (reactionTimes.length > 0) {
+      const avgReactionTime = reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length;
+      setAvgGazeTimeToTarget(avgReactionTime);
+    }
+  }, []); // collectedData.current는 ref이므로 의존성 배열에 필요 없음
+  // --- 변경/추가 끝 ---
+
+
+  // 3.2. CSV 다운로드 함수 (이제 모든 통계 데이터에 접근 가능)
   const downloadCSV = () => {
     // 1. 시스템 환경 메타데이터
     const systemMetaData = [
@@ -157,9 +218,15 @@ const GazeTracker: React.FC = () => {
       `# Calibration Stage 3 Success Rate: ${calStage3SuccessRate ? (calStage3SuccessRate * 100).toFixed(1) + '%' : 'N/A'}`,
       `# Validation Error (pixels): ${validationError ? validationError.toFixed(2) : 'N/A'}`,
       `# Gaze Stability (Avg. StdDev px): ${gazeStability ? gazeStability.toFixed(2) : 'N/A'}`,
+      '', // 항목 사이 공백
       `# --- Derived Task Metrics ---`,
+      // --- 변경/추가 ---
+      // 4가지 요약 통계를 모두 CSV에 포함
+      `# Avg. Click Time Taken (ms): ${avgClickTimeTaken ? avgClickTimeTaken.toFixed(2) : 'N/A'}`,
+      `# Avg. Gaze-to-Click Error (px): ${avgGazeToClickError ? avgGazeToClickError.toFixed(2) : 'N/A'}`,
       `# Avg. Gaze-Mouse Divergence (px): ${avgGazeMouseDivergence ? avgGazeMouseDivergence.toFixed(2) : 'N/A'}`,
       `# Avg. Gaze Time-to-Target (ms): ${avgGazeTimeToTarget ? avgGazeTimeToTarget.toFixed(2) : 'N/A'}`,
+      // --- 변경/추가 끝 ---
     ].join('\n');
 
     // 3. 개별 과제 결과 (taskResults state 기반)
@@ -191,7 +258,6 @@ const GazeTracker: React.FC = () => {
   };
 
   // --- 3. useEffect 훅 (Side Effects) ---
-  // (핸들러 함수들 뒤에 선언)
 
   // WebGazer.js 스크립트 로드
   useEffect(() => {
@@ -230,7 +296,7 @@ const GazeTracker: React.FC = () => {
       window.webgazer.clearGazeListener();
       if (validationGazePoints.current.length === 0) {
         alert("시선이 감지되지 않았습니다. 재보정을 진행합니다.");
-        handleRecalibrate(); // <-- 이제 이 함수는 이 Effect보다 먼저 선언됨
+        handleRecalibrate(); 
         return;
       }
 
@@ -255,7 +321,7 @@ const GazeTracker: React.FC = () => {
 
     }, 3000);
     return () => clearTimeout(timer);
-  }, [gameState, handleRecalibrate]); // handleRecalibrate 의존성 추가
+  }, [gameState, handleRecalibrate]); 
 
   // 과제용 랜덤 점 생성
   useEffect(() => {
@@ -315,58 +381,31 @@ const GazeTracker: React.FC = () => {
   }, [gameState]);
 
 
-  // 파생 데이터를 계산하는 함수
-  const analyzeTaskData = () => {
-    const data = collectedData.current;
-    if (data.length === 0) return;
+  // --- 변경/추가 ---
+  // gameState가 'finished'로 변경될 때 모든 요약 통계 계산
+  useEffect(() => {
+    if (gameState === 'finished') {
+      // 1. (기존) raw data 기반 파생 데이터 계산
+      analyzeTaskData(); 
 
-    // 3.1. 평균 시선-마우스 이격도
-    let lastMousePos = { x: 0, y: 0 };
-    const divergences: number[] = [];
-    for (const record of data) {
-      if (record.mouseX !== null && record.mouseY !== null) {
-        lastMousePos = { x: record.mouseX, y: record.mouseY };
-      }
-      if (record.gazeX !== null && record.gazeY !== null && lastMousePos.x !== 0) {
-        const dist = Math.sqrt(Math.pow(record.gazeX - lastMousePos.x, 2) + Math.pow(record.gazeY - lastMousePos.y, 2));
-        divergences.push(dist);
-      }
-    }
-    if (divergences.length > 0) {
-      const avgDivergence = divergences.reduce((a, b) => a + b, 0) / divergences.length;
-      setAvgGazeMouseDivergence(avgDivergence);
-    }
+      // 2. (신규) taskResults state 기반 요약 통계 계산
+      if (taskResults.length > 0) {
+        // 2.1. 평균 클릭 반응 시간 계산
+        const avgTime = taskResults.reduce((acc, r) => acc + r.timeTaken, 0) / taskResults.length;
+        setAvgClickTimeTaken(avgTime);
 
-    // 3.2. 평균 시선 반응 속도
-    const reactionTimes: number[] = [];
-    const GAZE_HIT_RADIUS = 100; 
-    for (let i = 1; i <= TOTAL_TASKS; i++) {
-      const startTime = taskStartTimes.current[i];
-      if (!startTime) continue;
-      const taskGazeEvents = data.filter(d => d.taskId === i && d.gazeX !== null && d.timestamp >= startTime);
-      if (taskGazeEvents.length === 0) continue;
-      const target = { x: taskGazeEvents[0].targetX, y: taskGazeEvents[0].targetY };
-      if (target.x === null || target.y === null) continue;
-      for (const event of taskGazeEvents) {
-        const dist = Math.sqrt(Math.pow(event.gazeX! - target.x, 2) + Math.pow(event.gazeY! - target.y, 2));
-        if (dist < GAZE_HIT_RADIUS) {
-          reactionTimes.push(event.timestamp - startTime); 
-          break; 
+        // 2.2. 평균 시선-클릭 지점 오차 계산
+        const validGazeToClick = taskResults.filter(r => r.gazeToClickDistance !== null);
+        if (validGazeToClick.length > 0) {
+          const avgError = validGazeToClick.reduce((acc, r) => acc + r.gazeToClickDistance!, 0) / validGazeToClick.length;
+          setAvgGazeToClickError(avgError);
+        } else {
+          setAvgGazeToClickError(null); // 유효한 데이터가 없으면 null로 설정
         }
       }
     }
-    if (reactionTimes.length > 0) {
-      const avgReactionTime = reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length;
-      setAvgGazeTimeToTarget(avgReactionTime);
-    }
-  };
-
-  // gameState가 'finished'로 변경될 때 분석 함수 호출
-  useEffect(() => {
-    if (gameState === 'finished') {
-      analyzeTaskData();
-    }
-  }, [gameState]);
+  }, [gameState, analyzeTaskData, taskResults]); // taskResults가 의존성 배열에 추가됨
+  // --- 변경/추가 끝 ---
 
 
   // --- 4. UI 렌더링 (Rendering) ---
@@ -402,13 +441,18 @@ const GazeTracker: React.FC = () => {
       case 'task':
         return <Task taskCount={taskCount} currentDot={currentDot} onDotClick={handleTaskDotClick} />;
       case 'finished':
+        // --- 변경/추가 ---
+        // 4가지 요약 통계 state를 모두 prop으로 전달
         return <Results 
                   taskResults={taskResults} 
                   onDownload={downloadCSV} 
                   screenSize={screenSize} 
                   avgGazeMouseDivergence={avgGazeMouseDivergence}
                   avgGazeTimeToTarget={avgGazeTimeToTarget}
+                  avgClickTimeTaken={avgClickTimeTaken}
+                  avgGazeToClickError={avgGazeToClickError}
                 />;
+        // --- 변경/추가 끝 ---
       default:
         return null;
     }
