@@ -24,6 +24,15 @@ type QualitySetting = 'low' | 'medium' | 'high';
 // 회귀 모델 선택을 위한 타입과 상태 추가
 type RegressionModel = 'ridge' | 'threadedRidge' | 'weightedRidge';
 
+// --- 변경/추가 ---
+// A/B 테스트 및 로깅을 위한 파라미터 상수화
+// (이 값들을 변경하며 테스트 결과를 비교)
+const USE_KALMAN_FILTER = true; // 칼만 필터 사용 여부 (true/false)
+const CALIBRATION_DWELL_RADIUS = 150; // 캘리브레이션 3단계 민감도 (px)
+// (참고: CALIBRATION_DWELL_RADIUS 값은 Calibration.tsx의 DWELL_RADIUS_PX 값과 일치해야 합니다.)
+// --- 변경/추가 끝 ---
+
+
 const GazeTracker: React.FC = () => {
   // --- 상태 관리 (State Management) ---
   const [gameState, setGameState] = useState<GameState>('idle');
@@ -168,7 +177,7 @@ const GazeTracker: React.FC = () => {
     
     window.webgazer.setTracker('TFFacemesh');// 얼굴 추적 모델을 설정. (clmtrackr(기본값) -> TFFacemesh)
 
-  /*  // threadedRidge worker 설정
+  /* // threadedRidge worker 설정
    if (window.webgazer.params) {
     window.webgazer.params.workerScriptPath = `${process.env.PUBLIC_URL}/webgazer.worker.js`;
   }
@@ -183,7 +192,11 @@ const GazeTracker: React.FC = () => {
     collectedData.current = [];
 
     window.webgazer.begin();
-    window.webgazer.applyKalmanFilter(true); // 칼만필터 활성화 -> 지연시간 발생 가능
+
+    // --- 변경 ---
+    // 상단에 정의한 USE_KALMAN_FILTER 상수를 사용하도록 수정
+    window.webgazer.applyKalmanFilter(USE_KALMAN_FILTER); 
+    // --- 변경 끝 ---
 
     setGameState('webcamCheck');
   };
@@ -245,10 +258,30 @@ const GazeTracker: React.FC = () => {
   };
 
   const downloadCSV = () => {
-    const metaData = `# Screen Size (width x height): ${screenSize ? `${screenSize.width}x${screenSize.height}` : 'N/A'}\n# Validation Error (pixels): ${validationError ? validationError.toFixed(2) : 'N/A'}\n`;
+    // --- 변경/추가 ---
+    // 1. 시스템 환경 메타데이터 (A/B 테스트 및 설정값 로깅)
+    const systemMetaData = [
+      `# --- System & Environment Settings ---`,
+      `# Camera Quality: ${quality}`,
+      `# Regression Model: ${regressionModel}`,
+      `# Kalman Filter Enabled: ${USE_KALMAN_FILTER}`,
+      `# Calibration Dwell Radius (px): ${CALIBRATION_DWELL_RADIUS}`,
+    ].join('\n');
+
+    // 2. 기존 측정 메타데이터 (측정 결과)
+    const measurementMetaData = [
+      `# --- Measurement Results ---`,
+      `# Screen Size (width x height): ${screenSize ? `${screenSize.width}x${screenSize.height}` : 'N/A'}`,
+      `# Validation Error (pixels): ${validationError ? validationError.toFixed(2) : 'N/A'}`,
+    ].join('\n');
+
     const header = 'timestamp,taskId,targetX,targetY,gazeX,gazeY,mouseX,mouseY';
     const rows = collectedData.current.map(d => `${d.timestamp},${d.taskId ?? ''},${d.targetX ?? ''},${d.targetY ?? ''},${d.gazeX ?? ''},${d.gazeY ?? ''},${d.mouseX ?? ''},${d.mouseY ?? ''}`).join('\n');
-    const csvContent = `${metaData}${header}\n${rows}`;
+    
+    // 메타데이터와 헤더, 데이터를 조합하여 CSV 내용 구성
+    const csvContent = `${systemMetaData}\n${measurementMetaData}\n\n${header}\n${rows}`;
+    // --- 변경/추가 끝 ---
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -266,6 +299,9 @@ const GazeTracker: React.FC = () => {
       case 'idle':
         return <Instructions onStart={handleStart} isScriptLoaded={isScriptLoaded} />;
       case 'webcamCheck':
+        // --- 변경/추가 ---
+        // (참고) USE_KALMAN_FILTER 값도 WebcamCheck 컴포넌트로 넘겨서
+        // 사용자가 UI에서 직접 켜고 끄도록 만들 수 있습니다. (지금은 상수 사용)
         return <WebcamCheck quality={quality} onQualityChange={setQuality} regressionModel={regressionModel} onRegressionChange={setRegressionModel}onComplete={handleCalibrationStart} />;
       case 'calibrating':
         return <Calibration onComplete={handleCalibrationComplete} liveGaze={liveGaze} />;
