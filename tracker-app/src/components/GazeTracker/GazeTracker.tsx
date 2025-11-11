@@ -30,7 +30,7 @@ const CALIBRATION_DWELL_RADIUS = 150;
 
 
 const GazeTracker: React.FC = () => {
-  // --- 상태 관리 (State Management) ---
+  // --- 1. 상태 관리 (State Management) ---
   const [gameState, setGameState] = useState<GameState>('idle');
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const collectedData = useRef<DataRecord[]>([]);
@@ -45,15 +45,153 @@ const GazeTracker: React.FC = () => {
   const [regressionModel, setRegressionModel] = useState<RegressionModel>('ridge'); 
   const [liveGaze, setLiveGaze] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
 
-  // --- 변경/추가 ---
-  // 2. 캘리브레이션 품질 지표 저장을 위한 state 추가
+  // 2. 캘리브레이션 품질 지표 state
   const [recalibrationCount, setRecalibrationCount] = useState(0);
-  const [gazeStability, setGazeStability] = useState<number | null>(null); // 시선 안정성 (표준편차)
-  const [calStage3SuccessRate, setCalStage3SuccessRate] = useState<number | null>(null); // 캘리브레이션 3단계 성공률
-  // --- 변경/추가 끝 ---
+  const [gazeStability, setGazeStability] = useState<number | null>(null); 
+  const [calStage3SuccessRate, setCalStage3SuccessRate] = useState<number | null>(null); 
+
+  // 3. 과제 수행 파생 데이터 state
+  const [avgGazeMouseDivergence, setAvgGazeMouseDivergence] = useState<number | null>(null);
+  const [avgGazeTimeToTarget, setAvgGazeTimeToTarget] = useState<number | null>(null);
+  
+  // 각 과제의 시작 시간을 기록하기 위한 ref
+  const taskStartTimes = useRef<Record<number, number>>({});
 
 
-  // --- useEffect 훅 (Side Effects) ---
+  // --- 변경/추가 ---
+  // --- 2. 이벤트 핸들러 (Event Handlers) ---
+  // (useEffect보다 먼저 선언되어야 참조 오류가 발생하지 않습니다)
+
+  // handleRecalibrate를 useCallback으로 감싸서 useEffect 의존성 문제 해결
+  const handleRecalibrate = useCallback(() => {
+    setValidationError(null);
+    setGazeStability(null); 
+    window.webgazer.clearData();
+    setGameState('calibrating');
+    
+    setRecalibrationCount(prevCount => prevCount + 1);
+  }, []); // 의존성 없음 (state setter 함수는 보장됨)
+
+  const handleCalibrationComplete = useCallback(() => {
+    setGameState('confirmValidation');
+  }, []);
+
+  const handleCalStage3Complete = useCallback((successRate: number) => {
+    setCalStage3SuccessRate(successRate);
+  }, []);
+
+  const handleStart = () => {
+    setTaskResults([]);
+    setScreenSize({ width: window.innerWidth, height: window.innerHeight }); 
+    if (!isScriptLoaded) return;
+    
+    window.webgazer.setTracker('TFFacemesh');
+    window.webgazer.setRegression('ridge');
+    collectedData.current = [];
+    window.webgazer.begin();
+    window.webgazer.applyKalmanFilter(USE_KALMAN_FILTER); 
+
+    // 모든 지표 초기화
+    setRecalibrationCount(0);
+    setGazeStability(null);
+    setValidationError(null);
+    setCalStage3SuccessRate(null);
+    setAvgGazeMouseDivergence(null);
+    setAvgGazeTimeToTarget(null);
+    taskStartTimes.current = {};
+
+    setGameState('webcamCheck');
+  };
+
+  const handleCalibrationStart = () => {
+    if (!window.webgazer) return;
+    const constraints = CAMERA_SETTINGS[quality];
+    window.webgazer.setCameraConstraints({ video: constraints });
+    window.webgazer.setRegression(regressionModel);
+    setGameState('calibrating');
+  };
+  
+  const handleTaskDotClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const clickTime = performance.now();
+    const lastGazeRecord = [...collectedData.current].reverse().find(d => d.gazeX !== null && d.gazeY !== null);
+    const lastGazePos = lastGazeRecord ? { x: lastGazeRecord.gazeX, y: lastGazeRecord.gazeY } : null;
+    const clickPos = { x: event.clientX, y: event.clientY };
+    const targetPos = currentDot;
+    const timeTaken = taskStartTime.current ? clickTime - taskStartTime.current : 0; 
+
+    let gazeToTargetDistance: number | null = null;
+    let gazeToClickDistance: number | null = null;
+
+    if (lastGazePos) { 
+      if (targetPos) {
+        gazeToTargetDistance = Math.sqrt(Math.pow(targetPos.x - lastGazePos.x!, 2) + Math.pow(targetPos.y - lastGazePos.y!, 2));
+      }
+      gazeToClickDistance = Math.sqrt(Math.pow(clickPos.x - lastGazePos.x!, 2) + Math.pow(clickPos.y - lastGazePos.y!, 2));
+    }
+
+    setTaskResults(prevResults => [...prevResults, { taskId: taskCount + 1, timeTaken, gazeToTargetDistance, gazeToClickDistance }]);
+
+    if (taskCount < TOTAL_TASKS - 1) {
+      setTaskCount(taskCount + 1);
+    } else {
+      setGameState('finished');
+      if (window.webgazer) window.webgazer.end();
+    }
+  };
+
+  const downloadCSV = () => {
+    // 1. 시스템 환경 메타데이터
+    const systemMetaData = [
+      `# --- System & Environment Settings ---`,
+      `# Camera Quality: ${quality}`,
+      `# Regression Model: ${regressionModel}`,
+      `# Kalman Filter Enabled: ${USE_KALMAN_FILTER}`,
+      `# Calibration Dwell Radius (px): ${CALIBRATION_DWELL_RADIUS}`,
+    ].join('\n');
+
+    // 2. 측정 메타데이터 (요약 지표)
+    const measurementMetaData = [
+      `# --- Measurement Summary ---`,
+      `# Screen Size (width x height): ${screenSize ? `${screenSize.width}x${screenSize.height}` : 'N/A'}`,
+      `# Recalibration Count: ${recalibrationCount}`,
+      `# Calibration Stage 3 Success Rate: ${calStage3SuccessRate ? (calStage3SuccessRate * 100).toFixed(1) + '%' : 'N/A'}`,
+      `# Validation Error (pixels): ${validationError ? validationError.toFixed(2) : 'N/A'}`,
+      `# Gaze Stability (Avg. StdDev px): ${gazeStability ? gazeStability.toFixed(2) : 'N/A'}`,
+      `# --- Derived Task Metrics ---`,
+      `# Avg. Gaze-Mouse Divergence (px): ${avgGazeMouseDivergence ? avgGazeMouseDivergence.toFixed(2) : 'N/A'}`,
+      `# Avg. Gaze Time-to-Target (ms): ${avgGazeTimeToTarget ? avgGazeTimeToTarget.toFixed(2) : 'N/A'}`,
+    ].join('\n');
+
+    // 3. 개별 과제 결과 (taskResults state 기반)
+    const taskResultsHeader = `# --- Individual Task Results ---`;
+    const taskResultsColumns = `taskId,timeTaken(ms),gazeToTargetDistance(px),gazeToClickDistance(px)`;
+    const taskResultsRows = taskResults.map(r => 
+      `${r.taskId},${r.timeTaken.toFixed(2)},${r.gazeToTargetDistance !== null ? r.gazeToTargetDistance.toFixed(2) : 'N/A'},${r.gazeToClickDistance !== null ? r.gazeToClickDistance.toFixed(2) : 'N/A'}`
+    ).join('\n');
+    const taskResultsCSV = `${taskResultsHeader}\n${taskResultsColumns}\n${taskResultsRows}`;
+
+    // 4. 원시 데이터 (Raw Data)
+    const rawDataHeader = `# --- Raw Gaze & Mouse Data --- \n# (Note: gazeX/gazeY and mouseX/mouseY are mutually exclusive per row)`;
+    const rawDataColumns = 'timestamp,taskId,targetX,targetY,gazeX,gazeY,mouseX,mouseY';
+    const rawDataRows = collectedData.current.map(d => `${d.timestamp},${d.taskId ?? ''},${d.targetX ?? ''},${d.targetY ?? ''},${d.gazeX ?? ''},${d.gazeY ?? ''},${d.mouseX ?? ''},${d.mouseY ?? ''}`).join('\n');
+    const rawDataCSV = `${rawDataHeader}\n${rawDataColumns}\n${rawDataRows}`;
+
+    // 5. 모든 CSV 섹션 조합
+    const csvContent = `${systemMetaData}\n\n${measurementMetaData}\n\n${taskResultsCSV}\n\n${rawDataCSV}`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'gaze_mouse_task_data.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // --- 3. useEffect 훅 (Side Effects) ---
+  // (핸들러 함수들 뒤에 선언)
 
   // WebGazer.js 스크립트 로드
   useEffect(() => {
@@ -79,12 +217,9 @@ const GazeTracker: React.FC = () => {
   useEffect(() => {
     if (gameState !== 'validating') return;
     
-    // --- 변경/추가 ---
-    // 측정 시작 시 기존 안정성/오차 값 초기화
     validationGazePoints.current = [];
     setValidationError(null);
     setGazeStability(null);
-    // --- 변경/추가 끝 ---
 
     const validationListener = (data: any) => {
       if (data) validationGazePoints.current.push({ x: data.x, y: data.y });
@@ -95,12 +230,10 @@ const GazeTracker: React.FC = () => {
       window.webgazer.clearGazeListener();
       if (validationGazePoints.current.length === 0) {
         alert("시선이 감지되지 않았습니다. 재보정을 진행합니다.");
-        handleRecalibrate(); // handleRecalibrate가 recalibrationCount를 증가시킴
+        handleRecalibrate(); // <-- 이제 이 함수는 이 Effect보다 먼저 선언됨
         return;
       }
 
-      // --- 변경/추가 ---
-      // 1. 평균 계산 (기존 로직)
       const avgGaze = validationGazePoints.current.reduce(
         (acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }),
         { x: 0, y: 0 }
@@ -108,25 +241,21 @@ const GazeTracker: React.FC = () => {
       avgGaze.x /= validationGazePoints.current.length;
       avgGaze.y /= validationGazePoints.current.length;
 
-      // 2. 평균 오차 계산 (기존 로직)
       const target = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
       const error = Math.sqrt(Math.pow(target.x - avgGaze.x, 2) + Math.pow(target.y - avgGaze.y, 2));
       setValidationError(error);
 
-      // 3. 시선 안정성 (표준 편차) 계산
       const sumSqDiffX = validationGazePoints.current.reduce((acc, p) => acc + Math.pow(p.x - avgGaze.x, 2), 0);
       const sumSqDiffY = validationGazePoints.current.reduce((acc, p) => acc + Math.pow(p.y - avgGaze.y, 2), 0);
       const stdDevX = Math.sqrt(sumSqDiffX / validationGazePoints.current.length);
       const stdDevY = Math.sqrt(sumSqDiffY / validationGazePoints.current.length);
       
-      // X, Y 표준편차의 평균을 시선 안정성 지표로 사용
       const stability = (stdDevX + stdDevY) / 2;
       setGazeStability(stability);
-      // --- 변경/추가 끝 ---
 
     }, 3000);
     return () => clearTimeout(timer);
-  }, [gameState]); // handleRecalibrate가 useCallback으로 감싸져 있지 않다면 dependency list에 추가해야 할 수 있으나, 현재 구조에서는 괜찮음.
+  }, [gameState, handleRecalibrate]); // handleRecalibrate 의존성 추가
 
   // 과제용 랜덤 점 생성
   useEffect(() => {
@@ -138,7 +267,10 @@ const GazeTracker: React.FC = () => {
         y = Math.floor(Math.random() * (window.innerHeight - padding * 2)) + padding;
       } while (x < FORBIDDEN_ZONE.width && y < FORBIDDEN_ZONE.height);
       setCurrentDot({ x, y });
-      taskStartTime.current = performance.now();
+      
+      const startTime = performance.now();
+      taskStartTime.current = startTime;
+      taskStartTimes.current[taskCount + 1] = startTime; 
     }
   }, [gameState, taskCount]);
 
@@ -183,130 +315,61 @@ const GazeTracker: React.FC = () => {
   }, [gameState]);
 
 
-  // --- 이벤트 핸들러 (Event Handlers) ---
+  // 파생 데이터를 계산하는 함수
+  const analyzeTaskData = () => {
+    const data = collectedData.current;
+    if (data.length === 0) return;
 
-  const handleStart = () => {
-    setTaskResults([]);
-    setScreenSize({ width: window.innerWidth, height: window.innerHeight }); 
-    if (!isScriptLoaded) return;
-    
-    window.webgazer.setTracker('TFFacemesh');
-    window.webgazer.setRegression('ridge');
-    collectedData.current = [];
-    window.webgazer.begin();
-    window.webgazer.applyKalmanFilter(USE_KALMAN_FILTER); 
-
-    // --- 변경/추가 ---
-    // 시작 시 재보정 횟수 및 관련 지표 초기화
-    setRecalibrationCount(0);
-    setGazeStability(null);
-    setValidationError(null);
-    setCalStage3SuccessRate(null);
-    // --- 변경/추가 끝 ---
-
-    setGameState('webcamCheck');
-  };
-
-  const handleCalibrationStart = () => {
-    if (!window.webgazer) return;
-    const constraints = CAMERA_SETTINGS[quality];
-    window.webgazer.setCameraConstraints({ video: constraints });
-    window.webgazer.setRegression(regressionModel);
-    setGameState('calibrating');
-  };
-
-  const handleCalibrationComplete = useCallback(() => {
-    setGameState('confirmValidation');
-  }, [setGameState]);
-
-  // --- 변경/추가 ---
-  // 캘리브레이션 3단계 성공률을 받는 콜백 함수
-  const handleCalStage3Complete = useCallback((successRate: number) => {
-    setCalStage3SuccessRate(successRate);
-  }, []);
-  // --- 변경/추가 끝 ---
-
-
-  const handleRecalibrate = () => {
-    setValidationError(null);
-    setGazeStability(null); // --- 변경/추가 ---
-    window.webgazer.clearData();
-    setGameState('calibrating');
-    
-    // --- 변경/추가 ---
-    // 재보정 횟수 증가
-    setRecalibrationCount(prevCount => prevCount + 1);
-    // --- 변경/추가 끝 ---
-  };
-  
-
-  const handleTaskDotClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    const clickTime = performance.now();
-    const lastGazeRecord = [...collectedData.current].reverse().find(d => d.gazeX !== null && d.gazeY !== null);
-    const lastGazePos = lastGazeRecord ? { x: lastGazeRecord.gazeX, y: lastGazeRecord.gazeY } : null;
-    const clickPos = { x: event.clientX, y: event.clientY };
-    const targetPos = currentDot;
-    const timeTaken = taskStartTime.current ? clickTime - taskStartTime.current : 0;
-
-    let gazeToTargetDistance: number | null = null;
-    let gazeToClickDistance: number | null = null;
-
-    if (lastGazePos) { 
-      if (targetPos) {
-        gazeToTargetDistance = Math.sqrt(Math.pow(targetPos.x - lastGazePos.x!, 2) + Math.pow(targetPos.y - lastGazePos.y!, 2));
+    // 3.1. 평균 시선-마우스 이격도
+    let lastMousePos = { x: 0, y: 0 };
+    const divergences: number[] = [];
+    for (const record of data) {
+      if (record.mouseX !== null && record.mouseY !== null) {
+        lastMousePos = { x: record.mouseX, y: record.mouseY };
       }
-      gazeToClickDistance = Math.sqrt(Math.pow(clickPos.x - lastGazePos.x!, 2) + Math.pow(clickPos.y - lastGazePos.y!, 2));
+      if (record.gazeX !== null && record.gazeY !== null && lastMousePos.x !== 0) {
+        const dist = Math.sqrt(Math.pow(record.gazeX - lastMousePos.x, 2) + Math.pow(record.gazeY - lastMousePos.y, 2));
+        divergences.push(dist);
+      }
+    }
+    if (divergences.length > 0) {
+      const avgDivergence = divergences.reduce((a, b) => a + b, 0) / divergences.length;
+      setAvgGazeMouseDivergence(avgDivergence);
     }
 
-    setTaskResults(prevResults => [...prevResults, { taskId: taskCount + 1, timeTaken, gazeToTargetDistance, gazeToClickDistance }]);
-
-    if (taskCount < TOTAL_TASKS - 1) {
-      setTaskCount(taskCount + 1);
-    } else {
-      setGameState('finished');
-      if (window.webgazer) window.webgazer.end();
+    // 3.2. 평균 시선 반응 속도
+    const reactionTimes: number[] = [];
+    const GAZE_HIT_RADIUS = 100; 
+    for (let i = 1; i <= TOTAL_TASKS; i++) {
+      const startTime = taskStartTimes.current[i];
+      if (!startTime) continue;
+      const taskGazeEvents = data.filter(d => d.taskId === i && d.gazeX !== null && d.timestamp >= startTime);
+      if (taskGazeEvents.length === 0) continue;
+      const target = { x: taskGazeEvents[0].targetX, y: taskGazeEvents[0].targetY };
+      if (target.x === null || target.y === null) continue;
+      for (const event of taskGazeEvents) {
+        const dist = Math.sqrt(Math.pow(event.gazeX! - target.x, 2) + Math.pow(event.gazeY! - target.y, 2));
+        if (dist < GAZE_HIT_RADIUS) {
+          reactionTimes.push(event.timestamp - startTime); 
+          break; 
+        }
+      }
+    }
+    if (reactionTimes.length > 0) {
+      const avgReactionTime = reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length;
+      setAvgGazeTimeToTarget(avgReactionTime);
     }
   };
 
-  const downloadCSV = () => {
-    // 1. 시스템 환경 메타데이터
-    const systemMetaData = [
-      `# --- System & Environment Settings ---`,
-      `# Camera Quality: ${quality}`,
-      `# Regression Model: ${regressionModel}`,
-      `# Kalman Filter Enabled: ${USE_KALMAN_FILTER}`,
-      `# Calibration Dwell Radius (px): ${CALIBRATION_DWELL_RADIUS}`,
-    ].join('\n');
+  // gameState가 'finished'로 변경될 때 분석 함수 호출
+  useEffect(() => {
+    if (gameState === 'finished') {
+      analyzeTaskData();
+    }
+  }, [gameState]);
 
-    // --- 변경/추가 ---
-    // 2. 측정 메타데이터 (캘리브레이션 품질 지표 포함)
-    const measurementMetaData = [
-      `# --- Measurement Results ---`,
-      `# Screen Size (width x height): ${screenSize ? `${screenSize.width}x${screenSize.height}` : 'N/A'}`,
-      `# Recalibration Count: ${recalibrationCount}`,
-      `# Calibration Stage 3 Success Rate: ${calStage3SuccessRate ? (calStage3SuccessRate * 100).toFixed(1) + '%' : 'N/A'}`,
-      `# Validation Error (pixels): ${validationError ? validationError.toFixed(2) : 'N/A'}`,
-      `# Gaze Stability (Avg. StdDev px): ${gazeStability ? gazeStability.toFixed(2) : 'N/A'}`,
-    ].join('\n');
-    // --- 변경/추가 끝 ---
 
-    const header = 'timestamp,taskId,targetX,targetY,gazeX,gazeY,mouseX,mouseY';
-    const rows = collectedData.current.map(d => `${d.timestamp},${d.taskId ?? ''},${d.targetX ?? ''},${d.targetY ?? ''},${d.gazeX ?? ''},${d.gazeY ?? ''},${d.mouseX ?? ''},${d.mouseY ?? ''}`).join('\n');
-    
-    const csvContent = `${systemMetaData}\n${measurementMetaData}\n\n${header}\n${rows}`;
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'gaze_mouse_task_data.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // --- UI 렌더링 (Rendering) ---
+  // --- 4. UI 렌더링 (Rendering) ---
   const renderContent = () => {
     switch (gameState) {
       case 'idle':
@@ -314,14 +377,11 @@ const GazeTracker: React.FC = () => {
       case 'webcamCheck':
         return <WebcamCheck quality={quality} onQualityChange={setQuality} regressionModel={regressionModel} onRegressionChange={setRegressionModel}onComplete={handleCalibrationStart} />;
       case 'calibrating':
-        // --- 변경/추가 ---
-        // 캘리브레이션 3단계 성공률 콜백 함수 전달
         return <Calibration 
                   onComplete={handleCalibrationComplete} 
                   liveGaze={liveGaze} 
                   onCalStage3Complete={handleCalStage3Complete} 
                 />;
-        // --- 변경/추가 끝 ---
       case 'confirmValidation':
          return ( 
           <div className="validation-container">
@@ -333,19 +393,22 @@ const GazeTracker: React.FC = () => {
           </div>
         );
       case 'validating':
-        // --- 변경/추가 ---
-        // 시선 안정성(gazeStability) 값도 Validation 컴포넌트로 전달 (표시용)
         return <Validation 
                   validationError={validationError} 
-                  gazeStability={gazeStability} // <-- 추가
+                  gazeStability={gazeStability}
                   onRecalibrate={handleRecalibrate} 
                   onStartTask={() => setGameState('task')} 
                 />;
-        // --- 변경/추가 끝 ---
       case 'task':
         return <Task taskCount={taskCount} currentDot={currentDot} onDotClick={handleTaskDotClick} />;
       case 'finished':
-        return <Results taskResults={taskResults} onDownload={downloadCSV} screenSize={screenSize} />;
+        return <Results 
+                  taskResults={taskResults} 
+                  onDownload={downloadCSV} 
+                  screenSize={screenSize} 
+                  avgGazeMouseDivergence={avgGazeMouseDivergence}
+                  avgGazeTimeToTarget={avgGazeTimeToTarget}
+                />;
       default:
         return null;
     }
