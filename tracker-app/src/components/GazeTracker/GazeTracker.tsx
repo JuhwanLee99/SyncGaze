@@ -26,7 +26,7 @@ type RegressionModel = 'ridge' | 'threadedRidge' | 'weightedRidge';
 
 // A/B 테스트 및 로깅을 위한 파라미터 상수화
 const USE_KALMAN_FILTER = true;
-const CALIBRATION_DWELL_RADIUS = 150;
+// const CALIBRATION_DWELL_RADIUS = 150; // 3단계 제거로 주석 처리 (또는 제거)
 
 
 const GazeTracker: React.FC = () => {
@@ -48,7 +48,10 @@ const GazeTracker: React.FC = () => {
   // 2. 캘리브레이션 품질 지표 state
   const [recalibrationCount, setRecalibrationCount] = useState(0);
   const [gazeStability, setGazeStability] = useState<number | null>(null);
-  const [calStage3SuccessRate, setCalStage3SuccessRate] = useState<number | null>(null);
+  // --- 1. 3단계 제거 (수정) ---
+  // 3단계 성공률 state 제거
+  // const [calStage3SuccessRate, setCalStage3SuccessRate] = useState<number | null>(null);
+  // --- 수정 끝 ---
 
   // 3. 과제 수행 파생 데이터 state
   const [avgGazeMouseDivergence, setAvgGazeMouseDivergence] = useState<number | null>(null);
@@ -81,9 +84,12 @@ const GazeTracker: React.FC = () => {
     setGameState('confirmValidation');
   }, []);
 
-  const handleCalStage3Complete = useCallback((successRate: number) => {
-    setCalStage3SuccessRate(successRate);
-  }, []);
+  // --- 1. 3단계 제거 (수정) ---
+  // 3단계 콜백 핸들러 제거
+  // const handleCalStage3Complete = useCallback((successRate: number) => {
+  //   setCalStage3SuccessRate(successRate);
+  // }, []);
+  // --- 수정 끝 ---
 
   const handleStart = () => {
     setTaskResults([]);
@@ -114,7 +120,7 @@ const GazeTracker: React.FC = () => {
     setRecalibrationCount(0);
     setGazeStability(null);
     setValidationError(null);
-    setCalStage3SuccessRate(null);
+    // setCalStage3SuccessRate(null); // 3단계 제거
     setAvgGazeMouseDivergence(null);
     setAvgGazeTimeToTarget(null);
     
@@ -235,7 +241,7 @@ const GazeTracker: React.FC = () => {
       `# Camera Quality: ${quality}`,
       `# Regression Model: ${regressionModel}`,
       `# Kalman Filter Enabled: ${USE_KALMAN_FILTER}`,
-      `# Calibration Dwell Radius (px): ${CALIBRATION_DWELL_RADIUS}`,
+      // `# Calibration Dwell Radius (px): ${CALIBRATION_DWELL_RADIUS}`, // 3단계 제거
     ].join('\n');
 
     // 2. 측정 메타데이터 (요약 지표)
@@ -243,7 +249,9 @@ const GazeTracker: React.FC = () => {
       `# --- Measurement Summary ---`,
       `# Screen Size (width x height): ${screenSize ? `${screenSize.width}x${screenSize.height}` : 'N/A'}`,
       `# Recalibration Count: ${recalibrationCount}`,
-      `# Calibration Stage 3 Success Rate: ${calStage3SuccessRate ? (calStage3SuccessRate * 100).toFixed(1) + '%' : 'N/A'}`,
+      // --- 1. 3단계 제거 (수정) ---
+      // `# Calibration Stage 3 Success Rate: ${calStage3SuccessRate ? (calStage3SuccessRate * 100).toFixed(1) + '%' : 'N/A'}`,
+      // --- 수정 끝 ---
       `# Validation Error (pixels): ${validationError ? validationError.toFixed(2) : 'N/A'}`,
       `# Gaze Stability (Avg. StdDev px): ${gazeStability ? gazeStability.toFixed(2) : 'N/A'}`,
       '', // 항목 사이 공백
@@ -411,7 +419,12 @@ const GazeTracker: React.FC = () => {
 
   // 캘리브레이션 중에만 시선 데이터를 state에 업데이트하는 useEffect 추가
   useEffect(() => {
+    // --- 1. 3단계 제거 (수정) ---
+    // 3단계가 제거되었으므로, 캘리브레이션 중 시선 데이터(liveGaze)는 
+    // 1단계(Smooth Pursuit)에서만 필요합니다.
+    // if (gameState === 'calibrating' && window.webgazer) { ->
     if (gameState === 'calibrating' && window.webgazer) {
+    // --- 수정 끝 ---
       const gazeListener = (data: any) => {
         if (data) {
           setLiveGaze({ x: data.x, y: data.y });
@@ -491,7 +504,9 @@ const GazeTracker: React.FC = () => {
         return <Calibration
                   onComplete={handleCalibrationComplete}
                   liveGaze={liveGaze}
-                  onCalStage3Complete={handleCalStage3Complete}
+                  // --- 1. 3단계 제거 (수정) ---
+                  // onCalStage3Complete={handleCalStage3Complete} // prop 제거
+                  // --- 수정 끝 ---
                 />;
       case 'confirmValidation':
          return (
@@ -515,7 +530,6 @@ const GazeTracker: React.FC = () => {
                   onStartTask={() => {
                     setGameState('task');
                   }}
-                  // --- 수정 끝 ---
                 />;
       case 'task':
         return <Task taskCount={taskCount} currentDot={currentDot} onDotClick={handleTaskDotClick} />;
