@@ -26,7 +26,9 @@ type RegressionModel = 'ridge' | 'threadedRidge' | 'weightedRidge';
 
 // A/B 테스트 및 로깅을 위한 파라미터 상수화
 const USE_KALMAN_FILTER = true;
-// const CALIBRATION_DWELL_RADIUS = 150; // 3단계 제거로 주석 처리 (또는 제거)
+// --- 3단계 복원 ---
+const CALIBRATION_DWELL_RADIUS = 150; // 3단계 Dwell Radius 복원
+// --- 복원 끝 ---
 
 
 const GazeTracker: React.FC = () => {
@@ -48,10 +50,9 @@ const GazeTracker: React.FC = () => {
   // 2. 캘리브레이션 품질 지표 state
   const [recalibrationCount, setRecalibrationCount] = useState(0);
   const [gazeStability, setGazeStability] = useState<number | null>(null);
-  // --- 1. 3단계 제거 (수정) ---
-  // 3단계 성공률 state 제거
-  // const [calStage3SuccessRate, setCalStage3SuccessRate] = useState<number | null>(null);
-  // --- 수정 끝 ---
+  // --- 3단계 복원 ---
+  const [calStage3SuccessRate, setCalStage3SuccessRate] = useState<number | null>(null);
+  // --- 복원 끝 ---
 
   // 3. 과제 수행 파생 데이터 state
   const [avgGazeMouseDivergence, setAvgGazeMouseDivergence] = useState<number | null>(null);
@@ -84,12 +85,11 @@ const GazeTracker: React.FC = () => {
     setGameState('confirmValidation');
   }, []);
 
-  // --- 1. 3단계 제거 (수정) ---
-  // 3단계 콜백 핸들러 제거
-  // const handleCalStage3Complete = useCallback((successRate: number) => {
-  //   setCalStage3SuccessRate(successRate);
-  // }, []);
-  // --- 수정 끝 ---
+  // --- 3단계 복원 ---
+  const handleCalStage3Complete = useCallback((successRate: number) => {
+    setCalStage3SuccessRate(successRate);
+  }, []);
+  // --- 복원 끝 ---
 
   const handleStart = () => {
     setTaskResults([]);
@@ -100,7 +100,7 @@ const GazeTracker: React.FC = () => {
     window.webgazer.setRegression('ridge');
     collectedData.current = [];
 
-    // --- 3. '선별적' 자가 보정 (수정) ---
+    // --- '선별적' 자가 보정 (수정) ---
     // (1단계) 기본(Default) 리스너 중지
     // webgazer.begin()이 호출되기 전에 파라미터를 설정합니다.
     // 'checkClick'과 'checkMove'를 false로 설정하여,
@@ -111,16 +111,15 @@ const GazeTracker: React.FC = () => {
       window.webgazer.params.checkMove = false;
       console.log("WebGazer default click/move listeners DISABLED for selective calibration.");
     }
-    // --- 수정 끝 ---
     
-    window.webgazer.begin(); // 이제 비활성화된 상태로 시작합니다.
+    window.webgazer.begin(); 
     window.webgazer.applyKalmanFilter(USE_KALMAN_FILTER);
 
     // 모든 지표 초기화
     setRecalibrationCount(0);
     setGazeStability(null);
     setValidationError(null);
-    // setCalStage3SuccessRate(null); // 3단계 제거
+    setCalStage3SuccessRate(null); // 3단계 복원
     setAvgGazeMouseDivergence(null);
     setAvgGazeTimeToTarget(null);
     
@@ -145,18 +144,14 @@ const GazeTracker: React.FC = () => {
   };
   
   const handleTaskDotClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    // --- 3. '선별적' 자가 보정 (수정) ---
-    // (3단계) '명중' 데이터만 선별 주입
-    // '명중' (Dot 클릭)은 '시선'과 '클릭'이 일치한 가장 확실한 '정답' 데이터입니다.
-    // 이 '명중' 데이터만 'click' 타입으로 WebGazer에 수동 주입하여 모델을 보정합니다.
+    // '선별적 자가 보정' 로직 (수정됨)
     if (window.webgazer && typeof window.webgazer.recordScreenPosition === 'function') {
       window.webgazer.recordScreenPosition(
         event.clientX,
         event.clientY,
-        'click' // 'click' 타입으로 가장 높은 가중치를 부여합니다.
+        'click' 
       );
     }
-    // --- 수정 끝 ---
 
     const clickTime = performance.now();
     const lastGazeRecord = [...collectedData.current].reverse().find(d => d.gazeX !== null && d.gazeY !== null);
@@ -175,7 +170,6 @@ const GazeTracker: React.FC = () => {
       gazeToClickDistance = Math.sqrt(Math.pow(clickPos.x - lastGazePos.x!, 2) + Math.pow(clickPos.y - lastGazePos.y!, 2));
     }
 
-    // taskResults state에 저장 (이 데이터는 'finished' 상태에서 계산됨)
     setTaskResults(prevResults => [...prevResults, { taskId: taskCount + 1, timeTaken, gazeToTargetDistance, gazeToClickDistance }]);
 
     if (taskCount < TOTAL_TASKS - 1) {
@@ -241,7 +235,9 @@ const GazeTracker: React.FC = () => {
       `# Camera Quality: ${quality}`,
       `# Regression Model: ${regressionModel}`,
       `# Kalman Filter Enabled: ${USE_KALMAN_FILTER}`,
-      // `# Calibration Dwell Radius (px): ${CALIBRATION_DWELL_RADIUS}`, // 3단계 제거
+      // --- 3단계 복원 ---
+      `# Calibration Dwell Radius (px): ${CALIBRATION_DWELL_RADIUS}`,
+      // --- 복원 끝 ---
     ].join('\n');
 
     // 2. 측정 메타데이터 (요약 지표)
@@ -249,9 +245,9 @@ const GazeTracker: React.FC = () => {
       `# --- Measurement Summary ---`,
       `# Screen Size (width x height): ${screenSize ? `${screenSize.width}x${screenSize.height}` : 'N/A'}`,
       `# Recalibration Count: ${recalibrationCount}`,
-      // --- 1. 3단계 제거 (수정) ---
-      // `# Calibration Stage 3 Success Rate: ${calStage3SuccessRate ? (calStage3SuccessRate * 100).toFixed(1) + '%' : 'N/A'}`,
-      // --- 수정 끝 ---
+      // --- 3단계 복원 ---
+      `# Calibration Stage 3 Success Rate: ${calStage3SuccessRate ? (calStage3SuccessRate * 100).toFixed(1) + '%' : 'N/A'}`,
+      // --- 복원 끝 ---
       `# Validation Error (pixels): ${validationError ? validationError.toFixed(2) : 'N/A'}`,
       `# Gaze Stability (Avg. StdDev px): ${gazeStability ? gazeStability.toFixed(2) : 'N/A'}`,
       '', // 항목 사이 공백
@@ -419,12 +415,14 @@ const GazeTracker: React.FC = () => {
 
   // 캘리브레이션 중에만 시선 데이터를 state에 업데이트하는 useEffect 추가
   useEffect(() => {
-    // --- 1. 3단계 제거 (수정) ---
-    // 3단계가 제거되었으므로, 캘리브레이션 중 시선 데이터(liveGaze)는 
-    // 1단계(Smooth Pursuit)에서만 필요합니다.
-    // if (gameState === 'calibrating' && window.webgazer) { ->
-    if (gameState === 'calibrating' && window.webgazer) {
+    // --- 1단계 제거 (수정) ---
+    // 1단계가 제거되었으므로, liveGaze는 3단계에서만 필요합니다.
+    // (기존) if (gameState === 'calibrating' && window.webgazer) { ... }
+    // 이 조건은 2단계(클릭)와 3단계(Pursuit) 모두에서 true가 됩니다.
+    // 3단계에서만 liveGaze를 사용하므로, 이 로직은 여전히 유효합니다.
+    // (특별히 수정할 필요 없음)
     // --- 수정 끝 ---
+    if (gameState === 'calibrating' && window.webgazer) {
       const gazeListener = (data: any) => {
         if (data) {
           setLiveGaze({ x: data.x, y: data.y });
@@ -504,9 +502,9 @@ const GazeTracker: React.FC = () => {
         return <Calibration
                   onComplete={handleCalibrationComplete}
                   liveGaze={liveGaze}
-                  // --- 1. 3단계 제거 (수정) ---
-                  // onCalStage3Complete={handleCalStage3Complete} // prop 제거
-                  // --- 수정 끝 ---
+                  // --- 3단계 복원 ---
+                  onCalStage3Complete={handleCalStage3Complete} 
+                  // --- 복원 끝 ---
                 />;
       case 'confirmValidation':
          return (
@@ -523,10 +521,7 @@ const GazeTracker: React.FC = () => {
                   validationError={validationError}
                   gazeStability={gazeStability}
                   onRecalibrate={handleRecalibrate}
-                  // --- 3. '선별적' 자가 보정 (수정) ---
-                  // 'stopMouseCalibration'이 존재하지 않으므로,
-                  // 'onStartTask'는 'task' 상태로 변경만 합니다.
-                  // (리스너 비활성화는 'handleStart'에서 이미 처리됨)
+                  // (이전 '선별적 자가 보정' 작업에서 이미 수정됨)
                   onStartTask={() => {
                     setGameState('task');
                   }}
