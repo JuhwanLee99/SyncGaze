@@ -54,19 +54,15 @@ const GazeTracker: React.FC = () => {
   const [avgGazeMouseDivergence, setAvgGazeMouseDivergence] = useState<number | null>(null);
   const [avgGazeTimeToTarget, setAvgGazeTimeToTarget] = useState<number | null>(null);
   
-  // --- 변경/추가 ---
   // Results.tsx에서 계산하던 통계 2개를 GazeTracker state로 이동
   const [avgClickTimeTaken, setAvgClickTimeTaken] = useState<number | null>(null);
   const [avgGazeToClickError, setAvgGazeToClickError] = useState<number | null>(null);
-  // --- 변경/추가 끝 ---
   
   // 각 과제의 시작 시간을 기록하기 위한 ref
   const taskStartTimes = useRef<Record<number, number>>({});
   
-  // --- 2. 사전 검증 단계 강화 (수정) ---
-  // WebGazer의 얼굴 감지 상태를 저장 (boolean으로 변경)
+  // 2. 사전 검증 단계 강화 (수정)
   const [isGazeDetected, setIsGazeDetected] = useState(false);
-  // --- 수정 끝 ---
 
 
   // --- 2. 이벤트 핸들러 (Event Handlers) ---
@@ -96,7 +92,21 @@ const GazeTracker: React.FC = () => {
     window.webgazer.setTracker('TFFacemesh');
     window.webgazer.setRegression('ridge');
     collectedData.current = [];
-    window.webgazer.begin();
+
+    // --- 3. '선별적' 자가 보정 (수정) ---
+    // (1단계) 기본(Default) 리스너 중지
+    // webgazer.begin()이 호출되기 전에 파라미터를 설정합니다.
+    // 'checkClick'과 'checkMove'를 false로 설정하여,
+    // WebGazer가 '모든' 클릭과 마우스 이동을
+    // 자동으로 학습하는 기본 동작을 중지시킵니다.
+    if (window.webgazer.params) {
+      window.webgazer.params.checkClick = false;
+      window.webgazer.params.checkMove = false;
+      console.log("WebGazer default click/move listeners DISABLED for selective calibration.");
+    }
+    // --- 수정 끝 ---
+    
+    window.webgazer.begin(); // 이제 비활성화된 상태로 시작합니다.
     window.webgazer.applyKalmanFilter(USE_KALMAN_FILTER);
 
     // 모든 지표 초기화
@@ -107,13 +117,9 @@ const GazeTracker: React.FC = () => {
     setAvgGazeMouseDivergence(null);
     setAvgGazeTimeToTarget(null);
     
-    // --- 변경/추가 ---
-    // 신규 2개 state 초기화
     setAvgClickTimeTaken(null);
     setAvgGazeToClickError(null);
-    // 2. 사전 검증 단계 강화 (수정)
     setIsGazeDetected(false); // 얼굴 감지 상태 초기화
-    // --- 수정 끝 ---
 
     taskStartTimes.current = {};
 
@@ -122,10 +128,8 @@ const GazeTracker: React.FC = () => {
 
   const handleCalibrationStart = () => {
     if (!window.webgazer) return;
-    // 2. 사전 검증 단계 강화: 리스너 정리 (수정)
     // webgazerCheck 상태에서 사용한 GazeListener를 정리합니다.
     window.webgazer.clearGazeListener();
-    // ---
     
     const constraints = CAMERA_SETTINGS[quality];
     window.webgazer.setCameraConstraints({ video: constraints });
@@ -134,6 +138,19 @@ const GazeTracker: React.FC = () => {
   };
   
   const handleTaskDotClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    // --- 3. '선별적' 자가 보정 (수정) ---
+    // (3단계) '명중' 데이터만 선별 주입
+    // '명중' (Dot 클릭)은 '시선'과 '클릭'이 일치한 가장 확실한 '정답' 데이터입니다.
+    // 이 '명중' 데이터만 'click' 타입으로 WebGazer에 수동 주입하여 모델을 보정합니다.
+    if (window.webgazer && typeof window.webgazer.recordScreenPosition === 'function') {
+      window.webgazer.recordScreenPosition(
+        event.clientX,
+        event.clientY,
+        'click' // 'click' 타입으로 가장 높은 가중치를 부여합니다.
+      );
+    }
+    // --- 수정 끝 ---
+
     const clickTime = performance.now();
     const lastGazeRecord = [...collectedData.current].reverse().find(d => d.gazeX !== null && d.gazeY !== null);
     const lastGazePos = lastGazeRecord ? { x: lastGazeRecord.gazeX, y: lastGazeRecord.gazeY } : null;
@@ -283,14 +300,8 @@ const GazeTracker: React.FC = () => {
   useEffect(() => {
     if (!isScriptLoaded || !window.webgazer) return;
     
-    // --- 수정 ---
-    // 'validating' (정확도 측정)과 'task' (과제 수행) 상태에서만
-    // 시선 예측 점(빨간 점)을 표시합니다.
-    // 'webcamCheck' 상태에서는 빨간 점을 숨겨 사용자가
-    // 예측 점에 영향을 받지 않고 얼굴 인식(녹색 사각형)만 확인하도록 합니다.
     const shouldShow = gameState === 'validating' || gameState === 'task';
     window.webgazer.showPredictionPoints(shouldShow);
-    // --- 수정 끝 ---
   }, [gameState, isScriptLoaded]);
 
   // 정확도 측정 로직
@@ -357,6 +368,8 @@ const GazeTracker: React.FC = () => {
   // 데이터 수집 리스너
   useEffect(() => {
     if (gameState !== 'task' || !window.webgazer) return;
+    
+    // 1. 시선 데이터 수집 리스너
     const gazeListener = (data: any) => {
       if (data) {
         collectedData.current.push({
@@ -367,14 +380,23 @@ const GazeTracker: React.FC = () => {
       }
     };
     window.webgazer.setGazeListener(gazeListener);
+    
+    // 2. 마우스 데이터 수집 리스너
     const mouseMoveListener = (event: MouseEvent) => {
+      // 2.1. (기존) 데이터 수집
       collectedData.current.push({
         timestamp: performance.now(), taskId: taskCount + 1,
         targetX: currentDot?.x ?? null, targetY: currentDot?.y ?? null,
         gazeX: null, gazeY: null, mouseX: event.clientX, mouseY: event.clientY,
       });
+      
+      // --- 3. '선별적' 자가 보정 (수정) ---
+      // 'mousemove'는 '노이즈'로 간주하므로,
+      // WebGazer가 학습하지 않도록 관련 코드를 모두 제거합니다.
+      // --- 수정 끝 ---
     };
     document.addEventListener('mousemove', mouseMoveListener);
+    
     return () => {
       window.webgazer.clearGazeListener();
       document.removeEventListener('mousemove', mouseMoveListener);
@@ -395,19 +417,15 @@ const GazeTracker: React.FC = () => {
   }, [gameState]);
 
 
-  // --- 2. 사전 검증 단계 강화 (수정) ---
   // gameState이 'webcamCheck'일 때 WebGazer의 시선 감지 리스너를 설정합니다.
-  // (기존 setFaceFeedbackListener 대신 setGazeListener 사용)
   useEffect(() => {
     if (gameState === 'webcamCheck' && window.webgazer) {
       setIsGazeDetected(false); // 상태 초기화
 
       const gazeListener = (data: any) => {
-        // data가 null이 아니고, x, y 값이 존재하면
         if (data && data.x !== null && data.y !== null) {
           setIsGazeDetected(true); // 감지 성공으로 상태 변경
-          // 일단 한번 감지되면, 이 리스너는 더 이상 필요 없으므로 정리합니다.
-          if (window.webgazer) { // (다시 한번 확인)
+          if (window.webgazer) {
             window.webgazer.clearGazeListener();
           }
         }
@@ -415,16 +433,13 @@ const GazeTracker: React.FC = () => {
       
       window.webgazer.setGazeListener(gazeListener);
       
-      // 'webcamCheck' 상태가 종료되면(캘리브레이션 시작 또는 취소) 리스너를 정리합니다.
       return () => {
-        // GazeListener가 clear되지 않았을 수 있으므로 여기서도 정리
         if (window.webgazer) {
           window.webgazer.clearGazeListener();
         }
       };
     }
   }, [gameState]);
-  // --- 수정 끝 ---
 
 
   // gameState가 'finished'로 변경될 때 모든 요약 통계 계산
@@ -464,7 +479,6 @@ const GazeTracker: React.FC = () => {
                   regressionModel={regressionModel}
                   onRegressionChange={setRegressionModel}
                   onComplete={handleCalibrationStart}
-                  // 2. 사전 검증 단계 강화: 감지 상태 prop 전달 (수정)
                   isGazeDetected={isGazeDetected}
                 />;
       case 'calibrating':
@@ -488,7 +502,14 @@ const GazeTracker: React.FC = () => {
                   validationError={validationError}
                   gazeStability={gazeStability}
                   onRecalibrate={handleRecalibrate}
-                  onStartTask={() => setGameState('task')}
+                  // --- 3. '선별적' 자가 보정 (수정) ---
+                  // 'stopMouseCalibration'이 존재하지 않으므로,
+                  // 'onStartTask'는 'task' 상태로 변경만 합니다.
+                  // (리스너 비활성화는 'handleStart'에서 이미 처리됨)
+                  onStartTask={() => {
+                    setGameState('task');
+                  }}
+                  // --- 수정 끝 ---
                 />;
       case 'task':
         return <Task taskCount={taskCount} currentDot={currentDot} onDotClick={handleTaskDotClick} />;
