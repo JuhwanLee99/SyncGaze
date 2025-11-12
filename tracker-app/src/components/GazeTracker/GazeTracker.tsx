@@ -62,6 +62,7 @@ const GazeTracker: React.FC = () => {
   const taskStartTimes = useRef<Record<number, number>>({});
   
   // 2. 사전 검증 단계 강화 (수정)
+  // WebGazer의 얼굴 감지 상태를 저장 (boolean으로 변경)
   const [isGazeDetected, setIsGazeDetected] = useState(false);
 
 
@@ -300,6 +301,11 @@ const GazeTracker: React.FC = () => {
   useEffect(() => {
     if (!isScriptLoaded || !window.webgazer) return;
     
+    // --- 수정 ---
+    // 'validating' (정확도 측정)과 'task' (과제 수행) 상태에서만
+    // 시선 예측 점(빨간 점)을 표시합니다.
+    // 'webcamCheck' 상태에서는 빨간 점을 숨겨 사용자가
+    // 예측 점에 영향을 받지 않고 얼굴 인식(녹색 사각형)만 확인하도록 합니다.
     const shouldShow = gameState === 'validating' || gameState === 'task';
     window.webgazer.showPredictionPoints(shouldShow);
   }, [gameState, isScriptLoaded]);
