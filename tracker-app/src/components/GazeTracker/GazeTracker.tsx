@@ -16,8 +16,8 @@ import Results from './Results';
 // 품질별 카메라 설정 값을 상수로 정의
 const CAMERA_SETTINGS = {
   low: { width: 640, height: 480, frameRate: 30 },
-  medium: { width: 1280, height: 720, frameRate: 30 },
-  high: { width: 1280, height: 720, frameRate: 60 },
+  medium: { width: 1280, height: 720, frameRate: 60 },
+  high: { width: 1920, height: 1080, frameRate: 60 },
 };
 // 품질 설정을 위한 타입 정의
 type QualitySetting = 'low' | 'medium' | 'high';
