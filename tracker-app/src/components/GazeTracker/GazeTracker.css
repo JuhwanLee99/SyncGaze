@@ -382,3 +382,80 @@
   margin-top: 8px;
   padding: 0 5px;
 }
+
+/* --- Results.tsx의 테이블 UI 개선 (밝은 테마, 폭 축소, 항목별 구분선) --- */
+
+.results-table-container {
+  /* [변경] display: inline-block;을 설정하여 
+    컨테이너가 내부 테이블의 너비만큼만 차지하도록 합니다.
+    (기존 width: 100% 제거)
+  */
+  display: inline-block;
+  
+  border: 1px solid #ddd; /* 전체 컨테이너 테두리 (밝은 회색) */
+  border-radius: 4px;
+  margin-top: 20px;
+  background-color: #fff; /* 배경색 (흰색) */
+  
+  /* [추가] 테이블이 부모 컨테이너(.results-container)보다 
+    커지는 것을 방지하기 위해 max-width 설정 
+  */
+  max-width: 100%;
+  overflow-x: auto; /* 내용이 너무 길어지면 가로 스크롤 생성 */
+}
+
+.results-table-container table {
+  /* [변경] width: 100%를 제거하여 테이블이 내용물에 맞게 
+    자동으로 축소되도록 합니다.
+  */
+  border-collapse: collapse; /* 테두리 겹침 */
+  color: #333; /* 글자색 (어두운 회색) */
+}
+
+.results-table-container th,
+.results-table-container td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee; /* 행 구분선 (더 밝은 회색) */
+  border-right: 1px solid #eee; /* 항목별 세로 구분선 */
+  
+  /* [추가] 컬럼 너비가 내용에 맞게 유지되도록 
+    줄바꿈을 방지합니다.
+  */
+  white-space: nowrap;
+}
+
+/* 마지막 항목(셀)의 오른쪽 세로 구분선은 제거 */
+.results-table-container th:last-child,
+.results-table-container td:last-child {
+  border-right: none;
+}
+
+.results-table-container td {
+  text-align: right; /* 데이터(숫자)는 우측 정렬 */
+  padding-right: 12px;
+}
+
+/* 첫 번째 항목(Task ID)만 좌측 정렬 */
+.results-table-container th:first-child,
+.results-table-container td:first-child {
+  text-align: left;
+  padding-left: 12px;
+}
+
+.results-table-container th {
+  background-color: #f9f9f9; /* 헤더 배경색 (아주 밝은 회색) */
+  font-weight: 600; /* 헤더 글씨 굵게 */
+  border-bottom: 1px solid #ddd; /* 헤더 하단 구분선은 조금 더 진하게 */
+  position: sticky; 
+  top: 0;
+  z-index: 1;
+}
+
+.results-table-container tr:nth-child(even) {
+  background-color: #fcfcfc;
+}
+
+.results-table-container tr:hover {
+  background-color: #f1f1f1; /* 마우스 호버 시 배경색 */
+}

@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-type QualitySetting = 'low' | 'medium' | 'high'; 
+type QualitySetting = 'low' | 'medium' | 'high';
 type RegressionModel = 'ridge' | 'threadedRidge' | 'weightedRidge';
 
 interface WebcamCheckProps {
@@ -11,9 +11,47 @@ interface WebcamCheckProps {
   regressionModel: RegressionModel;
   onRegressionChange: (model: RegressionModel) => void;
   onComplete: () => void;
+  // --- 2. 사전 검증 단계 강화 (수정) ---
+  isGazeDetected: boolean; // 얼굴 감지 상태를 boolean prop으로 받음
+  // --- 수정 끝 ---
 }
 
-const WebcamCheck: React.FC<WebcamCheckProps> = ({ quality, onQualityChange, regressionModel, onRegressionChange, onComplete }) => {
+// --- 2. 사전 검증 단계 강화 (수정) ---
+// 감지 상태에 따라 다른 메시지와 스타일을 반환하는 헬퍼 컴포넌트
+const DetectionStatusDisplay: React.FC<{ isDetected: boolean }> = ({ isDetected }) => {
+  let message = '';
+  let className = '';
+
+  if (isDetected) {
+    message = '상태: 안정적 - 얼굴 특징점이 명확히 감지되었습니다. 캘리브레이션을 시작하세요.';
+    className = 'status-success';
+  } else {
+    message = '상태: 감지 중... 웹캠 화면에 얼굴 특징점이 표시되는지 확인하세요. (조명이 어둡거나 역광이면 감지가 안 될 수 있습니다.)';
+    className = 'status-pending';
+  }
+
+  return (
+    <div className={`detection-status-container ${className}`}>
+      {/* --- 수정: <strong>을 <h3>으로 변경하여 강조 --- */}
+      <h3>{message}</h3>
+      {/* --- 수정 끝 --- */}
+    </div>
+  );
+};
+// --- 수정 끝 ---
+
+
+const WebcamCheck: React.FC<WebcamCheckProps> = ({
+  quality,
+  onQualityChange,
+  regressionModel,
+  onRegressionChange,
+  onComplete,
+  // --- 2. 사전 검증 단계 강화 (수정) ---
+  isGazeDetected
+  // --- 수정 끝 ---
+}) => {
+  
   return (
     <div className="instructions">
       <h3>웹캠 및 얼굴 인식 확인</h3>
@@ -74,9 +112,17 @@ const WebcamCheck: React.FC<WebcamCheckProps> = ({ quality, onQualityChange, reg
         </div>
       </div>
 
+      {/* --- 2. 사전 검증 단계 강화 (수정) --- */}
+      {/* 감지 상태를 표시하는 UI 수정 */}
+      <DetectionStatusDisplay isDetected={isGazeDetected} />
+      
       <div style={{ textAlign: 'center', marginTop: '20px' }}>
-        <button onClick={onComplete}>확인 완료, 캘리브레이션 시작</button>
+        {/* 감지 성공 상태가 아니면 버튼 비활성화 */}
+        <button onClick={onComplete} disabled={!isGazeDetected}>
+          확인 완료, 캘리브레이션 시작
+        </button>
       </div>
+      {/* --- 수정 끝 --- */}
     </div>
   );
 };
