@@ -1,5 +1,7 @@
+// src/index.tsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom'; // <--- 추가
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
@@ -9,7 +11,9 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter> {/* <--- App 컴포넌트를 감싸줍니다 */}
+      <App />
+    </BrowserRouter>
   </React.StrictMode>
 );
 
