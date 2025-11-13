@@ -16,6 +16,14 @@ function ConsentForm() {
       return;
     }
     
+    // (임시) sessionStorage에 동의 타임스탬프 저장
+    try {
+      sessionStorage.setItem('consentTimestamp', new Date().toISOString());
+    } catch (e) {
+      setError('동의 정보를 브라우저에 저장하는 데 실패했습니다.');
+      return;
+    }
+
     // (선택 사항) 동의 사실을 백엔드에 기록
     // fetch('/api/submit-consent', { ... });
 

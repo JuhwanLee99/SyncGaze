@@ -88,6 +88,14 @@ function ScreenerSurvey() {
         return;
     }
 
+    // 5. (임시) 백엔드 전송 대신 sessionStorage에 폼 데이터 저장
+    try {
+      sessionStorage.setItem('surveyData', JSON.stringify(formData));
+    } catch (err) {
+      setError('브라우저 저장소에 설문 데이터를 저장하는 데 실패했습니다. (브라우저 설정 확인)');
+      return;
+    }
+
     // 5. (중요) 백엔드로 데이터 전송
     // 프론트엔드(React)는 CSV 파일을 직접 "저장"할 수 없습니다.
     // 수집된 formData를 백엔드 API로 전송(POST)해야 합니다.

@@ -229,6 +229,38 @@ const GazeTracker: React.FC = () => {
 
   // 3.2. CSV 다운로드 함수 (이제 모든 통계 데이터에 접근 가능)
   const downloadCSV = () => {
+
+    ///////////////////////////////////////////////////////////////////////
+    // --- 여기부터 신규 추가 ---
+    // 0. (신규) sessionStorage에서 설문조사 및 동의 데이터 가져오기
+    const surveyDataString = sessionStorage.getItem('surveyData');
+    const consentTimestamp = sessionStorage.getItem('consentTimestamp');
+    let participantMetaData = [`# --- Participant Survey & Consent ---`];
+
+    if (surveyDataString) {
+      try {
+        // SurveyData 타입을 여기서 다시 정의하거나 any로 캐스팅합니다.
+        // 간단하게 any를 사용하겠습니다.
+        const surveyData: any = JSON.parse(surveyDataString);
+        participantMetaData.push(`# Survey Age Check: ${surveyData.ageCheck}`);
+        participantMetaData.push(`# Survey Webcam Check: ${surveyData.webcamCheck}`);
+        participantMetaData.push(`# Survey Games Played: ${Array.isArray(surveyData.gamesPlayed) ? surveyData.gamesPlayed.join('; ') : surveyData.gamesPlayed}`);
+        participantMetaData.push(`# Survey Main Game: ${surveyData.mainGame}`);
+        participantMetaData.push(`# Survey In-Game Rank: ${surveyData.inGameRank}`);
+        participantMetaData.push(`# Survey Play Time: ${surveyData.playTime}`);
+        participantMetaData.push(`# Survey Self-Assessment: ${surveyData.selfAssessment}`);
+      } catch (e) {
+        participantMetaData.push(`# Error Parsing Survey Data: ${e}`);
+      }
+    } else {
+      participantMetaData.push(`# Survey Data: NOT_FOUND`);
+    }
+    participantMetaData.push(`# Consent Timestamp: ${consentTimestamp || 'NOT_FOUND'}`);
+    const participantMetaDataCSV = participantMetaData.join('\n');
+    // --- 신규 추가 끝 ---
+    ///////////////////////////////////////////////////////////////////////////
+
+
     // 1. 시스템 환경 메타데이터
     const systemMetaData = [
       `# --- System & Environment Settings ---`,
@@ -272,8 +304,8 @@ const GazeTracker: React.FC = () => {
     const rawDataRows = collectedData.current.map(d => `${d.timestamp},${d.taskId ?? ''},${d.targetX ?? ''},${d.targetY ?? ''},${d.gazeX ?? ''},${d.gazeY ?? ''},${d.mouseX ?? ''},${d.mouseY ?? ''}`).join('\n');
     const rawDataCSV = `${rawDataHeader}\n${rawDataColumns}\n${rawDataRows}`;
 
-    // 5. 모든 CSV 섹션 조합
-    const csvContent = `${systemMetaData}\n\n${measurementMetaData}\n\n${taskResultsCSV}\n\n${rawDataCSV}`;
+    // 5. 모든 CSV 섹션 조합 (설문조사 내용 추가 버전)
+    const csvContent = `${participantMetaDataCSV}\n\n${systemMetaData}\n\n${measurementMetaData}\n\n${taskResultsCSV}\n\n${rawDataCSV}`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -284,6 +316,10 @@ const GazeTracker: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    // (섦문조사 관련 선택 사항) 다운로드 후 스토리지 비우기
+    sessionStorage.removeItem('surveyData');
+    sessionStorage.removeItem('consentTimestamp');
   };
 
   // --- 3. useEffect 훅 (Side Effects) ---
