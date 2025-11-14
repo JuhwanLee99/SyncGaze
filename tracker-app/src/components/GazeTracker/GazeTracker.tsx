@@ -498,8 +498,8 @@ const GazeTracker: React.FC = () => {
 
   // --- (수정) gameState 'finished' 시, 통계 계산 *및* 자동 업로드 실행 ---
   useEffect(() => {
-    // 1. 'finished' 상태가 아니면 아무것도 하지 않음
-    if (gameState !== 'finished') {
+    // 1. 'finished' 상태가 아니거나, '처음 상태(idle)'가 아니면 아무것도 하지 않음
+    if (gameState !== 'finished' || uploadStatus !== 'idle') {
       return;
     }
 
