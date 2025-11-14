@@ -69,6 +69,9 @@ const GazeTracker: React.FC = () => {
   // WebGazer의 얼굴 감지 상태를 저장 (boolean으로 변경)
   const [isGazeDetected, setIsGazeDetected] = useState(false);
 
+  // --- Vercel Blob 업로드 상태 추가 ---
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+
 
   // --- 2. 이벤트 핸들러 (Event Handlers) ---
 
@@ -119,13 +122,13 @@ const GazeTracker: React.FC = () => {
     setRecalibrationCount(0);
     setGazeStability(null);
     setValidationError(null);
-    setCalStage3SuccessRate(null); // 3단계 복원
+    setCalStage3SuccessRate(null);
     setAvgGazeMouseDivergence(null);
     setAvgGazeTimeToTarget(null);
-    
     setAvgClickTimeTaken(null);
     setAvgGazeToClickError(null);
     setIsGazeDetected(false); // 얼굴 감지 상태 초기화
+    setUploadStatus('idle'); // 업로드 상태 초기화
 
     taskStartTimes.current = {};
 
@@ -227,11 +230,8 @@ const GazeTracker: React.FC = () => {
   }, []); // collectedData.current는 ref이므로 의존성 배열에 필요 없음
 
 
-  // 3.2. CSV 다운로드 함수 (이제 모든 통계 데이터에 접근 가능)
-  const downloadCSV = () => {
-
-    ///////////////////////////////////////////////////////////////////////
-    // --- 여기부터 신규 추가 ---
+  // --- (신규) CSV 콘텐츠 생성 로직 분리 ---
+  const generateCsvContent = useCallback(() => {
     // 0. (신규) sessionStorage에서 설문조사 및 동의 데이터 가져오기
     const surveyDataString = sessionStorage.getItem('surveyData');
     const consentTimestamp = sessionStorage.getItem('consentTimestamp');
@@ -249,17 +249,14 @@ const GazeTracker: React.FC = () => {
         participantMetaData.push(`# Survey In-Game Rank: ${surveyData.inGameRank}`);
         participantMetaData.push(`# Survey Play Time: ${surveyData.playTime}`);
         participantMetaData.push(`# Survey Self-Assessment: ${surveyData.selfAssessment}`);
-      } catch (e) {
-        participantMetaData.push(`# Error Parsing Survey Data: ${e}`);
+      } catch (e: any) {
+        participantMetaData.push(`# Error Parsing Survey Data: ${e.message}`);
       }
     } else {
       participantMetaData.push(`# Survey Data: NOT_FOUND`);
     }
     participantMetaData.push(`# Consent Timestamp: ${consentTimestamp || 'NOT_FOUND'}`);
     const participantMetaDataCSV = participantMetaData.join('\n');
-    // --- 신규 추가 끝 ---
-    ///////////////////////////////////////////////////////////////////////////
-
 
     // 1. 시스템 환경 메타데이터
     const systemMetaData = [
@@ -267,9 +264,7 @@ const GazeTracker: React.FC = () => {
       `# Camera Quality: ${quality}`,
       `# Regression Model: ${regressionModel}`,
       `# Kalman Filter Enabled: ${USE_KALMAN_FILTER}`,
-      // --- 3단계 복원 ---
       `# Calibration Dwell Radius (px): ${CALIBRATION_DWELL_RADIUS}`,
-      // --- 복원 끝 ---
     ].join('\n');
 
     // 2. 측정 메타데이터 (요약 지표)
@@ -277,9 +272,7 @@ const GazeTracker: React.FC = () => {
       `# --- Measurement Summary ---`,
       `# Screen Size (width x height): ${screenSize ? `${screenSize.width}x${screenSize.height}` : 'N/A'}`,
       `# Recalibration Count: ${recalibrationCount}`,
-      // --- 3단계 복원 ---
       `# Calibration Stage 3 Success Rate: ${calStage3SuccessRate ? (calStage3SuccessRate * 100).toFixed(1) + '%' : 'N/A'}`,
-      // --- 복원 끝 ---
       `# Validation Error (pixels): ${validationError ? validationError.toFixed(2) : 'N/A'}`,
       `# Gaze Stability (Avg. StdDev px): ${gazeStability ? gazeStability.toFixed(2) : 'N/A'}`,
       '', // 항목 사이 공백
@@ -304,9 +297,24 @@ const GazeTracker: React.FC = () => {
     const rawDataRows = collectedData.current.map(d => `${d.timestamp},${d.taskId ?? ''},${d.targetX ?? ''},${d.targetY ?? ''},${d.gazeX ?? ''},${d.gazeY ?? ''},${d.mouseX ?? ''},${d.mouseY ?? ''}`).join('\n');
     const rawDataCSV = `${rawDataHeader}\n${rawDataColumns}\n${rawDataRows}`;
 
-    // 5. 모든 CSV 섹션 조합 (설문조사 내용 추가 버전)
+    // 5. 모든 CSV 섹션 조합
     const csvContent = `${participantMetaDataCSV}\n\n${systemMetaData}\n\n${measurementMetaData}\n\n${taskResultsCSV}\n\n${rawDataCSV}`;
+    
+    return csvContent;
+  }, [
+    quality, regressionModel, screenSize, recalibrationCount, calStage3SuccessRate,
+    validationError, gazeStability, avgClickTimeTaken, avgGazeToClickError,
+    avgGazeMouseDivergence, avgGazeTimeToTarget, taskResults
+  ]);
 
+
+  // --- (수정) 3.2. CSV 다운로드 함수 ---
+  // 이제 분리된 generateCsvContent()를 호출합니다.
+  const downloadCSV = () => {
+    // 1. CSV 콘텐츠 생성
+    const csvContent = generateCsvContent();
+
+    // 2. Blob 생성 및 다운로드 링크 클릭
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -317,7 +325,7 @@ const GazeTracker: React.FC = () => {
     link.click();
     document.body.removeChild(link);
 
-    // (섦문조사 관련 선택 사항) 다운로드 후 스토리지 비우기
+    // 3. (기존) 다운로드 후 스토리지 비우기
     sessionStorage.removeItem('surveyData');
     sessionStorage.removeItem('consentTimestamp');
   };
@@ -451,13 +459,6 @@ const GazeTracker: React.FC = () => {
 
   // 캘리브레이션 중에만 시선 데이터를 state에 업데이트하는 useEffect 추가
   useEffect(() => {
-    // --- 1단계 제거 (수정) ---
-    // 1단계가 제거되었으므로, liveGaze는 3단계에서만 필요합니다.
-    // (기존) if (gameState === 'calibrating' && window.webgazer) { ... }
-    // 이 조건은 2단계(클릭)와 3단계(Pursuit) 모두에서 true가 됩니다.
-    // 3단계에서만 liveGaze를 사용하므로, 이 로직은 여전히 유효합니다.
-    // (특별히 수정할 필요 없음)
-    // --- 수정 끝 ---
     if (gameState === 'calibrating' && window.webgazer) {
       const gazeListener = (data: any) => {
         if (data) {
@@ -495,29 +496,70 @@ const GazeTracker: React.FC = () => {
   }, [gameState]);
 
 
-  // gameState가 'finished'로 변경될 때 모든 요약 통계 계산
+  // --- (수정) gameState 'finished' 시, 통계 계산 *및* 자동 업로드 실행 ---
   useEffect(() => {
-    if (gameState === 'finished') {
-      // 1. (기존) raw data 기반 파생 데이터 계산
-      analyzeTaskData();
+    // 1. 'finished' 상태가 아니면 아무것도 하지 않음
+    if (gameState !== 'finished') {
+      return;
+    }
 
-      // 2. (신규) taskResults state 기반 요약 통계 계산
-      if (taskResults.length > 0) {
-        // 2.1. 평균 클릭 반응 시간 계산
-        const avgTime = taskResults.reduce((acc, r) => acc + r.timeTaken, 0) / taskResults.length;
-        setAvgClickTimeTaken(avgTime);
+    // 2. (기존) 통계 계산
+    analyzeTaskData();
 
-        // 2.2. 평균 시선-클릭 지점 오차 계산
-        const validGazeToClick = taskResults.filter(r => r.gazeToClickDistance !== null);
-        if (validGazeToClick.length > 0) {
-          const avgError = validGazeToClick.reduce((acc, r) => acc + r.gazeToClickDistance!, 0) / validGazeToClick.length;
-          setAvgGazeToClickError(avgError);
-        } else {
-          setAvgGazeToClickError(null); // 유효한 데이터가 없으면 null로 설정
-        }
+    if (taskResults.length > 0) {
+      const avgTime = taskResults.reduce((acc, r) => acc + r.timeTaken, 0) / taskResults.length;
+      setAvgClickTimeTaken(avgTime);
+
+      const validGazeToClick = taskResults.filter(r => r.gazeToClickDistance !== null);
+      if (validGazeToClick.length > 0) {
+        const avgError = validGazeToClick.reduce((acc, r) => acc + r.gazeToClickDistance!, 0) / validGazeToClick.length;
+        setAvgGazeToClickError(avgError);
+      } else {
+        setAvgGazeToClickError(null);
       }
     }
-  }, [gameState, analyzeTaskData, taskResults]); // taskResults가 의존성 배열에 추가됨
+
+    // 3. (신규) 자동 업로드 함수 정의 및 즉시 실행 (IIFE)
+    (async () => {
+      // state 계산이 완료될 때까지 잠시 대기 (안전을 위해)
+      await new Promise(resolve => setTimeout(resolve, 0)); 
+      
+      setUploadStatus('uploading');
+      
+      // 3.1. CSV 콘텐츠 생성 (분리된 함수 호출)
+      const csvContent = generateCsvContent();
+
+      // 3.2. Vercel 서버리스 함수(/api/upload-csv)로 업로드 요청
+      try {
+        const response = await fetch('/api/upload-csv', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8;',
+          },
+          body: csvContent,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('Upload Success:', result.url);
+        setUploadStatus('success');
+
+        // (선택 사항) 업로드 성공 시 스토리지 비우기
+        // downloadCSV를 누를 때 이미 비워지므로, 이쪽이 더 적절할 수 있습니다.
+        sessionStorage.removeItem('surveyData');
+        sessionStorage.removeItem('consentTimestamp');
+
+      } catch (error) {
+        console.error('Upload Failed:', error);
+        setUploadStatus('error');
+      }
+    })();
+    
+  // 의존성 배열에 generateCsvContent 추가
+  }, [gameState, analyzeTaskData, taskResults, generateCsvContent]);
 
 
   // --- 4. UI 렌더링 (Rendering) ---
@@ -557,7 +599,6 @@ const GazeTracker: React.FC = () => {
                   validationError={validationError}
                   gazeStability={gazeStability}
                   onRecalibrate={handleRecalibrate}
-                  // (이전 '선별적 자가 보정' 작업에서 이미 수정됨)
                   onStartTask={() => {
                     setGameState('task');
                   }}
@@ -573,6 +614,8 @@ const GazeTracker: React.FC = () => {
                   avgGazeTimeToTarget={avgGazeTimeToTarget}
                   avgClickTimeTaken={avgClickTimeTaken}
                   avgGazeToClickError={avgGazeToClickError}
+                  // (참고) 업로드 상태를 표시하려면 Results.tsx props 수정 필요
+                  // uploadStatus={uploadStatus} 
                 />;
       default:
         return null;
