@@ -6,16 +6,14 @@ import { CalibrationProps, CalibrationStage } from '../types/calibration';
 import { 
   CALIBRATION_DOTS, 
   CLICKS_PER_DOT, 
-  STAGE_1_DURATION, 
-  STAGE_3_DURATION,
+  STAGE_2_DURATION,
   DWELL_RADIUS_PX 
 } from '../constants/calibration';
 
 /**
  * 3-Stage Calibration Component
- * Stage 1: Smooth pursuit (circular motion)
- * Stage 2: Point calibration (13-point grid)
- * Stage 3: Final refinement (Lissajous curve)
+ * Stage 1: Point calibration (13-point grid)
+ * Stage 2: Final refinement (Lissajous curve)
  */
 // ============================================
 // VALIDATION OVERLAY COMPONENT
@@ -198,7 +196,7 @@ export const CalibrationOverlay: React.FC<CalibrationProps> = ({ onComplete, liv
     const dot = dotRef.current;
     if (!dot) return;
 
-    const DURATION = stage === 1 ? STAGE_1_DURATION : STAGE_3_DURATION;
+    const DURATION = STAGE_2_DURATION;
     let startTime: number;
 
     const animate = (timestamp: number) => {

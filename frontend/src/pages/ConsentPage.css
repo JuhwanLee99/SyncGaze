@@ -1,0 +1,28 @@
+/* frontend/src/pages/ConsentPage.css */
+
+/* SurveyPage.css와 동일한 페이지 레이아웃 스타일을 적용합니다. */
+.consent-page-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* 상단 정렬 */
+  min-height: 100vh;
+  padding: 40px 20px;
+  background-color: #f4f7f6; /* 기존 페이지 스타일과 유사한 배경 */
+  box-sizing: border-box;
+}
+
+.consent-content-wrapper {
+  width: 100%;
+  max-width: 800px; /* 동의서 폼의 최대 너비 (SurveyPage와 동일) */
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  padding: 30px;
+}
+
+/* 참고: ConsentForm.tsx 내부의 세부 스타일 
+  (예: 스크롤 박스, 동의 체크박스 영역)은
+  ConsentForm.tsx가 import하는 자체 CSS 파일이 있다면
+  그 파일이 계속 담당하게 됩니다.
+  (1단계에서 해당 CSS도 같이 복사했어야 합니다.)
+*/
