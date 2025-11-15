@@ -1,0 +1,214 @@
+// src/pages/TrainingPage.tsx
+import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Scene } from '../components/Scene';
+import './TrainingPage.css';
+
+interface TrainingData {
+  timestamp: number;
+  gazeX: number | null;
+  gazeY: number | null;
+  mouseX: number | null;
+  mouseY: number | null;
+  targetHit: boolean;
+  targetId: string | null;
+}
+
+const TrainingPage = () => {
+  const navigate = useNavigate();
+  const [timeRemaining, setTimeRemaining] = useState(60);
+  const [isTraining, setIsTraining] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
+  const [score, setScore] = useState(0);
+  const trainingDataRef = useRef<TrainingData[]>([]);
+  const startTimeRef = useRef<number>(0);
+
+  // Timer countdown
+  useEffect(() => {
+    if (!isTraining || isComplete) return;
+
+    const interval = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          handleTrainingComplete();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isTraining, isComplete]);
+
+  const handleStartTraining = () => {
+    setIsTraining(true);
+    startTimeRef.current = Date.now();
+    trainingDataRef.current = [];
+    setScore(0);
+    setTimeRemaining(60);
+  };
+
+  const handleTrainingComplete = () => {
+    setIsComplete(true);
+    setIsTraining(false);
+    
+    // Generate CSV
+    const csvData = generateCSV(trainingDataRef.current);
+    
+    // Save to localStorage for ResultsPage
+    localStorage.setItem('lastTrainingSession', JSON.stringify({
+      sessionId: Date.now().toString(),
+      date: new Date().toISOString(),
+      duration: 60,
+      score: score,
+      csvData: csvData,
+      rawData: trainingDataRef.current
+    }));
+  };
+
+  const generateCSV = (data: TrainingData[]): string => {
+    const headers = ['Timestamp', 'GazeX', 'GazeY', 'MouseX', 'MouseY', 'TargetHit', 'TargetID'];
+    const rows = data.map(d => [
+      d.timestamp,
+      d.gazeX ?? '',
+      d.gazeY ?? '',
+      d.mouseX ?? '',
+      d.mouseY ?? '',
+      d.targetHit ? 'true' : 'false',
+      d.targetId ?? ''
+    ]);
+    
+    return [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+  };
+
+  const handleViewResults = () => {
+    navigate('/results');
+  };
+
+  const handleBackToDashboard = () => {
+    navigate('/dashboard');
+  };
+
+  const recordTrainingData = (data: Partial<TrainingData>) => {
+    trainingDataRef.current.push({
+      timestamp: Date.now() - startTimeRef.current,
+      gazeX: data.gazeX ?? null,
+      gazeY: data.gazeY ?? null,
+      mouseX: data.mouseX ?? null,
+      mouseY: data.mouseY ?? null,
+      targetHit: data.targetHit ?? false,
+      targetId: data.targetId ?? null
+    });
+  };
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="training-page">
+      {/* Pre-Training Instructions */}
+      {!isTraining && !isComplete && (
+        <div className="training-overlay">
+          <div className="training-instructions">
+            <h1>Ready to Train?</h1>
+            <div className="training-info">
+              <div className="info-item">
+                <span className="info-icon">⏱️</span>
+                <div>
+                  <h3>60-Second Session</h3>
+                  <p>Hit as many targets as possible within 60 seconds</p>
+                </div>
+              </div>
+              
+              <div className="info-item">
+                <span className="info-icon">🎯</span>
+                <div>
+                  <h3>Track Your Gaze</h3>
+                  <p>Your eye movements and mouse clicks will be recorded</p>
+                </div>
+              </div>
+              
+              <div className="info-item">
+                <span className="info-icon">📊</span>
+                <div>
+                  <h3>Get Insights</h3>
+                  <p>After training, view detailed analytics and CSV data</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="training-controls">
+              <button className="start-button" onClick={handleStartTraining}>
+                Start Training
+              </button>
+              <button className="back-button-inline" onClick={handleBackToDashboard}>
+                Back to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Training Complete */}
+      {isComplete && (
+        <div className="training-overlay">
+          <div className="training-complete">
+            <h1>Training Complete!</h1>
+            <div className="completion-stats">
+              <div className="stat">
+                <span className="stat-label">Final Score</span>
+                <span className="stat-value">{score}</span>
+              </div>
+              <div className="stat">
+                <span className="stat-label">Duration</span>
+                <span className="stat-value">60s</span>
+              </div>
+              <div className="stat">
+                <span className="stat-label">Data Points</span>
+                <span className="stat-value">{trainingDataRef.current.length}</span>
+              </div>
+            </div>
+            
+            <div className="completion-message">
+              <p>✅ Your training data has been saved and converted to CSV</p>
+              <p>View detailed analytics and download your data on the results page</p>
+            </div>
+            
+            <div className="training-controls">
+              <button className="view-results-button" onClick={handleViewResults}>
+                View Results & Analytics
+              </button>
+              <button className="back-button-inline" onClick={handleBackToDashboard}>
+                Back to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* HUD - Timer and Score */}
+      {isTraining && (
+        <div className="training-hud">
+          <div className="hud-item">
+            <span className="hud-label">Time</span>
+            <span className="hud-value time">{formatTime(timeRemaining)}</span>
+          </div>
+          <div className="hud-item">
+            <span className="hud-label">Score</span>
+            <span className="hud-value score">{score}</span>
+          </div>
+        </div>
+      )}
+
+    
+    </div>
+  );
+};
+
+export default TrainingPage;
