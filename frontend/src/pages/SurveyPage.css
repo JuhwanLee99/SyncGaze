@@ -1,0 +1,23 @@
+/* frontend/src/pages/SurveyPage.css */
+
+.survey-page-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* 상단 정렬 */
+  min-height: 100vh;
+  padding: 40px 20px;
+  background-color: #f4f7f6; /* frontend의 다른 페이지와 유사한 배경색 */
+  box-sizing: border-box;
+}
+
+.survey-content-wrapper {
+  width: 100%;
+  max-width: 800px; /* 설문조사 폼의 최대 너비 */
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  padding: 30px;
+}
+
+/* ScreenerSurvey 컴포넌트 내부의 h1, p, button 등에 대한 
+   스타일을 이곳에 추가하거나 수정할 수 있습니다. */

@@ -2,8 +2,11 @@
 
 import { CalibrationDot } from '../types/calibration';
 
+// 카메라 미리보기 영역 + 여유 공간
+export const FORBIDDEN_ZONE = { width: 340, height: 260 };
+
 /**
- * 13-point calibration grid for Stage 2
+ * 13-point calibration grid for Stage 1
  * Points are strategically placed to cover the entire screen
  * while avoiding the camera preview area (top-left)
  */
@@ -31,21 +34,16 @@ export const CALIBRATION_DOTS: CalibrationDot[] = [
 ];
 
 /**
- * Number of clicks required per dot in Stage 2
+ * Number of clicks required per dot in Stage 1
  */
 export const CLICKS_PER_DOT = 3;
 
 /**
- * Duration for Stage 1 smooth pursuit (milliseconds)
+ * Duration for Stage 2 refinement (milliseconds)
  */
-export const STAGE_1_DURATION = 18000; // 18 seconds
+export const STAGE_2_DURATION = 20000; // 20 seconds
 
 /**
- * Duration for Stage 3 refinement (milliseconds)
- */
-export const STAGE_3_DURATION = 20000; // 20 seconds
-
-/**
- * Radius for determining if gaze is "on target" in Stage 3 (pixels)
+ * Radius for determining if gaze is "on target" in Stage 2 (pixels)
  */
 export const DWELL_RADIUS_PX = 150;
