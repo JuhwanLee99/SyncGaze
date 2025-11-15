@@ -50,6 +50,8 @@
   transition: all 0.2s;
   /* 기본 상태에서 중앙 정렬을 위해 transform 추가 */
   transform: translate(-50%, -50%);
+
+  z-index: 100000; /* WebGazer(99999)보다 높은 값 */
 }
 
 .calibration-dot:hover {
@@ -62,6 +64,19 @@
   background-color: darkred;
 }
 
+.calibration-message {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #333;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 10px 20px;
+  border-radius: 8px;
+  z-index: 99999; /* 점(100000)보다 밑에 표시 */
+}
 
 /* 시선추적 캘리브레이션 영역 */
 
