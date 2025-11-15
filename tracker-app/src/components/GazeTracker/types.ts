@@ -28,3 +28,6 @@ export interface DotPosition {
   x: number;
   y: number;
 }
+
+export type QualitySetting = 'low' | 'medium' | 'high';
+export type RegressionModel = 'ridge' | 'threadedRidge' | 'weightedRidge';
