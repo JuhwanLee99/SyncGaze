@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { Environment } from './Environment';
-import GameController from './GameController';
+import { GameController } from './GameController';
 import { Crosshair } from './Crosshair';
 import { GlockModel } from './GlockModel';
 import { CameraController } from './CameraController';
