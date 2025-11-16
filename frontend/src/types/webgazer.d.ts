@@ -14,6 +14,7 @@ declare global {
       clearData(): void;
       setTracker(tracker: string): void;
       setRegression(regression: string): void;
+      setCameraConstraints?: (constraints: MediaStreamConstraints) => void;
       applyKalmanFilter(apply: boolean): void;
       recordScreenPosition?: (x: number, y: number, type?: string) => void;
       params?: {

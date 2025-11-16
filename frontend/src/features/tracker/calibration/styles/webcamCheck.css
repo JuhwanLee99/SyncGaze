@@ -1,0 +1,115 @@
+.webcam-check-panel {
+  width: min(900px, 90vw);
+  background: rgba(7, 10, 34, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 2.5rem;
+  color: #f2f2ff;
+  backdrop-filter: blur(8px);
+}
+
+.webcam-check-header h2 {
+  font-size: 2rem;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.webcam-check-header p {
+  color: #c9c9f4;
+  line-height: 1.6;
+}
+
+.webcam-guidelines {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.webcam-guidelines ul {
+  margin: 1rem 0 0;
+  padding-left: 1.25rem;
+  line-height: 1.6;
+  color: #e4e4ff;
+}
+
+.quality-selector,
+.regression-selector {
+  margin-top: 2rem;
+}
+
+.quality-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.quality-options button {
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  transition: border 0.2s ease, transform 0.2s ease;
+}
+
+.quality-options button span {
+  font-size: 0.85rem;
+  color: #c9c9f4;
+  font-weight: 400;
+}
+
+.quality-options button.active {
+  border-color: #8ab4ff;
+  background: rgba(138, 180, 255, 0.12);
+  transform: translateY(-2px);
+}
+
+.regression-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.regression-options label {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  color: #e4e4ff;
+}
+
+.detection-status {
+  margin-top: 2rem;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.detection-status.pending {
+  background: rgba(255, 193, 59, 0.12);
+  border: 1px solid rgba(255, 193, 59, 0.4);
+  color: #ffdf99;
+}
+
+.detection-status.success {
+  background: rgba(0, 197, 143, 0.12);
+  border: 1px solid rgba(0, 197, 143, 0.4);
+  color: #8cf0d0;
+}
+
+.confirm-row {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.confirm-row .primary-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

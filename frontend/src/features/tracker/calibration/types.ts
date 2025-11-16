@@ -1,10 +1,14 @@
 export type GameState =
   | 'idle'
+  | 'webcamCheck'
   | 'calibrating'
   | 'confirmValidation'
   | 'validating'
   | 'task'
   | 'finished';
+
+export type QualitySetting = 'low' | 'medium' | 'high';
+export type RegressionModel = 'ridge' | 'threadedRidge' | 'weightedRidge'; // 삭제 필요
 
 export interface DataRecord {
   timestamp: number;
