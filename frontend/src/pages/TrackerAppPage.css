@@ -1,0 +1,173 @@
+.tracker-app-page {
+  min-height: 100vh;
+  padding: 48px clamp(24px, 5vw, 72px);
+  background: linear-gradient(180deg, #05070d 0%, #0d111a 40%, #0d111a 100%);
+  color: #f5f7fa;
+}
+
+.tracker-app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.tracker-app-header .eyebrow {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: #6c7cff;
+  margin-bottom: 8px;
+}
+
+.tracker-app-header h1 {
+  margin: 0 0 8px 0;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+}
+
+.tracker-app-header .subtitle {
+  margin: 0;
+  color: #aab4d4;
+}
+
+.link-button {
+  border: none;
+  background: transparent;
+  color: #8ddcff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tracker-app-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.card {
+  background: rgba(13, 17, 26, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.card-header h2 {
+  margin: 0;
+}
+
+.status-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.status-pill.pending {
+  background: rgba(255, 193, 79, 0.15);
+  color: #ffc14f;
+}
+
+.status-pill.success {
+  background: rgba(92, 243, 159, 0.15);
+  color: #5cf39f;
+}
+
+.survey-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  line-height: 1.4;
+}
+
+.checkbox-row input {
+  margin-top: 4px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-field input,
+.form-field select {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(5, 7, 13, 0.8);
+  padding: 12px 14px;
+  color: #f5f7fa;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+  outline: 2px solid #6c7cff;
+}
+
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.chip {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 8px 16px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.chip.selected {
+  background: rgba(108, 124, 255, 0.15);
+  border-color: #6c7cff;
+}
+
+.primary-button,
+.secondary-button {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, #6c7cff, #4cb3ff);
+  color: #0a0f1c;
+}
+
+.secondary-button {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f5f7fa;
+}
+
+.consent-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .tracker-app-header {
+    flex-direction: column;
+  }
+}

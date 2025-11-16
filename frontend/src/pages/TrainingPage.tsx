@@ -1,34 +1,43 @@
 // src/pages/TrainingPage.tsx
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Scene } from '../components/Scene';
 import './TrainingPage.css';
-
-interface TrainingData {
-  timestamp: number;
-  gazeX: number | null;
-  gazeY: number | null;
-  mouseX: number | null;
-  mouseY: number | null;
-  targetHit: boolean;
-  targetId: string | null;
-}
+import {
+  TrainingDataPoint,
+  TrainingSessionSummary,
+  useTrackingSession,
+} from '../state/trackingSessionContext';
 
 const TrainingPage = () => {
   const navigate = useNavigate();
+  const { addSession, setActiveSessionId, calibrationResult } = useTrackingSession();
   const [timeRemaining, setTimeRemaining] = useState(60);
   const [isTraining, setIsTraining] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [score, setScore] = useState(0);
-  const trainingDataRef = useRef<TrainingData[]>([]);
+  const trainingDataRef = useRef<TrainingDataPoint[]>([]);
   const startTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!calibrationResult) {
+      navigate('/calibration');
+      return;
+    }
+    if (
+      calibrationResult.status !== 'validated' &&
+      calibrationResult.status !== 'skipped'
+    ) {
+      navigate('/calibration');
+    }
+  }, [calibrationResult, navigate]);
 
   // Timer countdown
   useEffect(() => {
     if (!isTraining || isComplete) return;
 
     const interval = setInterval(() => {
-      setTimeRemaining((prev) => {
+      setTimeRemaining(prev => {
         if (prev <= 1) {
           handleTrainingComplete();
           return 0;
@@ -42,31 +51,74 @@ const TrainingPage = () => {
 
   const handleStartTraining = () => {
     setIsTraining(true);
+    setIsComplete(false);
     startTimeRef.current = Date.now();
     trainingDataRef.current = [];
     setScore(0);
     setTimeRemaining(60);
   };
 
+  const summarizeTrainingData = useMemo(() => {
+    return (data: TrainingDataPoint[]) => {
+      if (data.length === 0) {
+        return {
+          targetsHit: 0,
+          totalTargets: 0,
+          accuracy: 0,
+          avgReactionTime: 0,
+          gazeAccuracy: 0,
+          mouseAccuracy: 0,
+        };
+      }
+
+      const hits = data.filter(point => point.targetHit);
+      const totalTargets = data.filter(point => point.targetId !== null).length || hits.length;
+      const targetsHit = hits.length;
+      const accuracy = totalTargets > 0 ? (targetsHit / totalTargets) * 100 : 0;
+      const avgReactionTime = hits.length > 0
+        ? hits.reduce((sum, hit) => sum + hit.timestamp, 0) / hits.length
+        : 0;
+      const gazeAccuracy = (data.filter(d => d.gazeX !== null && d.gazeY !== null).length / data.length) * 100;
+      const mouseAccuracy = (data.filter(d => d.mouseX !== null && d.mouseY !== null).length / data.length) * 100;
+
+      return {
+        targetsHit,
+        totalTargets,
+        accuracy,
+        avgReactionTime,
+        gazeAccuracy,
+        mouseAccuracy,
+      };
+    };
+  }, []);
+
   const handleTrainingComplete = () => {
     setIsComplete(true);
     setIsTraining(false);
-    
-    // Generate CSV
+
     const csvData = generateCSV(trainingDataRef.current);
-    
-    // Save to localStorage for ResultsPage
-    localStorage.setItem('lastTrainingSession', JSON.stringify({
-      sessionId: Date.now().toString(),
+    const analytics = summarizeTrainingData(trainingDataRef.current);
+
+    const sessionRecord: TrainingSessionSummary = {
+      id: Date.now().toString(),
       date: new Date().toISOString(),
       duration: 60,
       score: score,
-      csvData: csvData,
-      rawData: trainingDataRef.current
-    }));
+      accuracy: analytics.accuracy,
+      targetsHit: analytics.targetsHit,
+      totalTargets: analytics.totalTargets,
+      avgReactionTime: analytics.avgReactionTime,
+      gazeAccuracy: analytics.gazeAccuracy,
+      mouseAccuracy: analytics.mouseAccuracy,
+      csvData,
+      rawData: trainingDataRef.current,
+    };
+
+    addSession(sessionRecord);
+    setActiveSessionId(sessionRecord.id);
   };
 
-  const generateCSV = (data: TrainingData[]): string => {
+  const generateCSV = (data: TrainingDataPoint[]): string => {
     const headers = ['Timestamp', 'GazeX', 'GazeY', 'MouseX', 'MouseY', 'TargetHit', 'TargetID'];
     const rows = data.map(d => [
       d.timestamp,
@@ -75,13 +127,10 @@ const TrainingPage = () => {
       d.mouseX ?? '',
       d.mouseY ?? '',
       d.targetHit ? 'true' : 'false',
-      d.targetId ?? ''
+      d.targetId ?? '',
     ]);
-    
-    return [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
+
+    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   };
 
   const handleViewResults = () => {
@@ -92,7 +141,7 @@ const TrainingPage = () => {
     navigate('/dashboard');
   };
 
-  const recordTrainingData = (data: Partial<TrainingData>) => {
+  const recordTrainingData = (data: Partial<TrainingDataPoint>) => {
     trainingDataRef.current.push({
       timestamp: Date.now() - startTimeRef.current,
       gazeX: data.gazeX ?? null,
@@ -100,7 +149,7 @@ const TrainingPage = () => {
       mouseX: data.mouseX ?? null,
       mouseY: data.mouseY ?? null,
       targetHit: data.targetHit ?? false,
-      targetId: data.targetId ?? null
+      targetId: data.targetId ?? null,
     });
   };
 
@@ -112,6 +161,7 @@ const TrainingPage = () => {
 
   return (
     <div className="training-page">
+      <Scene />
       {/* Pre-Training Instructions */}
       {!isTraining && !isComplete && (
         <div className="training-overlay">
@@ -125,7 +175,7 @@ const TrainingPage = () => {
                   <p>Hit as many targets as possible within 60 seconds</p>
                 </div>
               </div>
-              
+
               <div className="info-item">
                 <span className="info-icon">🎯</span>
                 <div>
@@ -133,7 +183,7 @@ const TrainingPage = () => {
                   <p>Your eye movements and mouse clicks will be recorded</p>
                 </div>
               </div>
-              
+
               <div className="info-item">
                 <span className="info-icon">📊</span>
                 <div>
@@ -142,7 +192,7 @@ const TrainingPage = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="training-controls">
               <button className="start-button" onClick={handleStartTraining}>
                 Start Training
@@ -174,12 +224,12 @@ const TrainingPage = () => {
                 <span className="stat-value">{trainingDataRef.current.length}</span>
               </div>
             </div>
-            
+
             <div className="completion-message">
               <p>✅ Your training data has been saved and converted to CSV</p>
               <p>View detailed analytics and download your data on the results page</p>
             </div>
-            
+
             <div className="training-controls">
               <button className="view-results-button" onClick={handleViewResults}>
                 View Results & Analytics
@@ -205,8 +255,6 @@ const TrainingPage = () => {
           </div>
         </div>
       )}
-
-    
     </div>
   );
 };

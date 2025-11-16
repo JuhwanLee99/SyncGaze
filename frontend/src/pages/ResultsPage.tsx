@@ -2,25 +2,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './ResultsPage.css';
-
-interface SessionData {
-  sessionId: string;
-  date: string;
-  duration: number;
-  score: number;
-  csvData: string;
-  rawData: TrainingData[];
-}
-
-interface TrainingData {
-  timestamp: number;
-  gazeX: number | null;
-  gazeY: number | null;
-  mouseX: number | null;
-  mouseY: number | null;
-  targetHit: boolean;
-  targetId: string | null;
-}
+import {
+  TrainingDataPoint,
+  TrainingSessionSummary,
+  useTrackingSession,
+} from '../state/trackingSessionContext';
 
 interface Analytics {
   totalTargets: number;
@@ -33,43 +19,46 @@ interface Analytics {
 
 const ResultsPage = () => {
   const navigate = useNavigate();
-  const [sessionData, setSessionData] = useState<SessionData | null>(null);
+  const { activeSession } = useTrackingSession();
+  const [sessionData, setSessionData] = useState<TrainingSessionSummary | null>(activeSession);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
 
   useEffect(() => {
-    // Load session data from localStorage
-    const data = localStorage.getItem('lastTrainingSession');
-    if (!data) {
+    if (!activeSession) {
       navigate('/dashboard');
       return;
     }
+    setSessionData(activeSession);
+    setAnalytics(calculateAnalytics(activeSession.rawData));
+  }, [activeSession, navigate]);
 
-    const parsedData: SessionData = JSON.parse(data);
-    setSessionData(parsedData);
+  const calculateAnalytics = (data: TrainingDataPoint[]): Analytics => {
+    if (data.length === 0) {
+      return {
+        totalTargets: 0,
+        targetsHit: 0,
+        accuracy: 0,
+        avgReactionTime: 0,
+        gazeAccuracy: 0,
+        mouseAccuracy: 0,
+      };
+    }
 
-    // Calculate analytics
-    const analyticsData = calculateAnalytics(parsedData.rawData);
-    setAnalytics(analyticsData);
-  }, [navigate]);
-
-  const calculateAnalytics = (data: TrainingData[]): Analytics => {
     const hits = data.filter(d => d.targetHit);
-    const totalTargets = hits.length;
+    const totalTargets = data.filter(d => d.targetId !== null).length || hits.length;
     const targetsHit = hits.length;
-    
-    // Calculate average reaction time (time between target appearance and hit)
+
     const reactionTimes = hits.map(d => d.timestamp);
-    const avgReactionTime = reactionTimes.length > 0 
-      ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length 
+    const avgReactionTime = reactionTimes.length > 0
+      ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length
       : 0;
 
-    // Calculate gaze and mouse accuracy
     const dataWithGaze = data.filter(d => d.gazeX !== null && d.gazeY !== null);
     const dataWithMouse = data.filter(d => d.mouseX !== null && d.mouseY !== null);
-    
+
     const gazeAccuracy = (dataWithGaze.length / data.length) * 100;
     const mouseAccuracy = (dataWithMouse.length / data.length) * 100;
-    const accuracy = (targetsHit / (totalTargets || 1)) * 100;
+    const accuracy = totalTargets > 0 ? (targetsHit / totalTargets) * 100 : 0;
 
     return {
       totalTargets,
@@ -77,7 +66,7 @@ const ResultsPage = () => {
       accuracy,
       avgReactionTime,
       gazeAccuracy,
-      mouseAccuracy
+      mouseAccuracy,
     };
   };
 
@@ -88,7 +77,7 @@ const ResultsPage = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `training-session-${sessionData.sessionId}.csv`;
+    a.download = `training-session-${sessionData.id}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -168,7 +157,7 @@ const ResultsPage = () => {
         {/* Visualizations */}
         <section className="visualizations-section">
           <h2>Data Visualizations</h2>
-          
+
           <div className="viz-grid">
             {/* Accuracy Over Time */}
             <div className="viz-card">
@@ -198,80 +187,27 @@ const ResultsPage = () => {
                   <div className="heatmap-dot" style={{ top: '40%', left: '70%' }}></div>
                 </div>
                 <p className="viz-description">
-                  Visualization of where your gaze focused during training
-                </p>
-              </div>
-            </div>
-
-            {/* Reaction Time Distribution */}
-            <div className="viz-card">
-              <h3>Reaction Time Distribution</h3>
-              <div className="viz-placeholder">
-                <div className="placeholder-histogram">
-                  <div className="hist-bar" style={{ height: '40%' }}></div>
-                  <div className="hist-bar" style={{ height: '70%' }}></div>
-                  <div className="hist-bar" style={{ height: '100%' }}></div>
-                  <div className="hist-bar" style={{ height: '60%' }}></div>
-                  <div className="hist-bar" style={{ height: '30%' }}></div>
-                </div>
-                <p className="viz-description">
-                  Distribution of your reaction times across all targets
-                </p>
-              </div>
-            </div>
-
-            {/* Target Hit Pattern */}
-            <div className="viz-card">
-              <h3>Hit Pattern Analysis</h3>
-              <div className="viz-placeholder">
-                <div className="pattern-grid">
-                  {Array.from({ length: 16 }).map((_, i) => (
-                    <div 
-                      key={i} 
-                      className="pattern-cell"
-                      style={{ opacity: Math.random() > 0.3 ? 1 : 0.2 }}
-                    ></div>
-                  ))}
-                </div>
-                <p className="viz-description">
-                  Spatial distribution of successful target hits
+                  Visualize where your gaze was focused during the session
                 </p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Data Export */}
-        <section className="export-section">
-          <h2>Export Data</h2>
-          <div className="export-card">
-            <div className="export-info">
-              <div className="export-icon">📄</div>
-              <div>
-                <h3>Training Data CSV</h3>
-                <p>
-                  Download your complete training session data including timestamps, 
-                  gaze coordinates, mouse positions, and target hit information.
-                </p>
-                <p className="data-count">
-                  {sessionData.rawData.length} data points collected
-                </p>
-              </div>
-            </div>
+        {/* Raw Data */}
+        <section className="data-section">
+          <h2>Session Data</h2>
+          <div className="data-actions">
             <button className="download-button" onClick={downloadCSV}>
               Download CSV
             </button>
+            <button className="secondary-button" onClick={handleTrainAgain}>
+              Train Again
+            </button>
+            <button className="secondary-button" onClick={handleBackToDashboard}>
+              Back to Dashboard
+            </button>
           </div>
-        </section>
-
-        {/* Actions */}
-        <section className="actions-section">
-          <button className="action-button primary" onClick={handleTrainAgain}>
-            Train Again
-          </button>
-          <button className="action-button secondary" onClick={handleBackToDashboard}>
-            Back to Dashboard
-          </button>
         </section>
       </main>
     </div>
