@@ -19,13 +19,6 @@ declare global {
         checkClick?: boolean;
         checkMove?: boolean;
       };
-
-      // --- 여기에 누락된 함수 정의 추가 ---
-      setCameraConstraints(constraints: MediaStreamConstraints): Promise<MediaStream | null>;
-
-      recordScreenPosition(x: number, y: number, eventType: string): void;
-      // ------------------------------------
-
     };
   }
 }
