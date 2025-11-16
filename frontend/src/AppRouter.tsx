@@ -7,6 +7,7 @@ import TrainingPage from './pages/TrainingPage';
 import ResultsPage from './pages/ResultsPage';
 import TrackerAppPage from './pages/TrackerAppPage';
 import TrackerFlowPage from './pages/TrackerFlowPage';
+import SurveyPage from './pages/onboarding/SurveyPage';
 import { ReactElement } from 'react';
 
 const getIsAuthenticated = () => {
@@ -81,6 +82,14 @@ const AppRouter = () => {
           element={(
             <ProtectedRoute>
               <ResultsPage />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/onboarding/survey"
+          element={(
+            <ProtectedRoute>
+              <SurveyPage />
             </ProtectedRoute>
           )}
         />

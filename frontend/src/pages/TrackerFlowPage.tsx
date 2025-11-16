@@ -21,7 +21,7 @@ const TrackerFlowPage = () => {
         description: '기본 자격 확인과 연구 대상 선별',
         completed: Boolean(surveyResponses),
         actionLabel: surveyResponses ? '응답 수정' : '설문 작성',
-        navigateTo: '/tracker-app',
+        navigateTo: '/onboarding/survey',
       },
       {
         id: 'consent',

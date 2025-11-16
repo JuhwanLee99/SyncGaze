@@ -5,19 +5,13 @@ import {
   SurveyResponses,
   useTrackingSession,
 } from '../state/trackingSessionContext';
-
-const defaultSurvey: SurveyResponses = {
-  ageCheck: false,
-  webcamCheck: false,
-  gamesPlayed: [],
-  mainGame: '',
-  inGameRank: '',
-  playTime: '< 100시간',
-  selfAssessment: 5,
-};
+import {
+  defaultSurveyResponses,
+  playTimeOptions,
+  validateSurveyResponses,
+} from '../utils/onboarding';
 
 const gameOptions = ['Valorant', 'CS:GO / CS2', 'Apex 레전드', '기타'];
-const playTimeOptions = ['< 100시간', '100-300시간', '300-1000시간', '> 1000시간'];
 
 const TrackerAppPage = () => {
   const navigate = useNavigate();
@@ -28,7 +22,9 @@ const TrackerAppPage = () => {
     setConsentAccepted,
   } = useTrackingSession();
 
-  const [formData, setFormData] = useState<SurveyResponses>(surveyResponses ?? defaultSurvey);
+  const [formData, setFormData] = useState<SurveyResponses>(
+    surveyResponses ?? { ...defaultSurveyResponses },
+  );
 
   useEffect(() => {
     if (surveyResponses) {
@@ -36,15 +32,7 @@ const TrackerAppPage = () => {
     }
   }, [surveyResponses]);
 
-  const isSurveyComplete = useMemo(() => {
-    return (
-      formData.ageCheck &&
-      formData.webcamCheck &&
-      formData.gamesPlayed.length > 0 &&
-      formData.mainGame.trim().length > 0 &&
-      formData.inGameRank.trim().length > 0
-    );
-  }, [formData]);
+  const isSurveyComplete = useMemo(() => !validateSurveyResponses(formData), [formData]);
 
   const handleGameToggle = (game: string) => {
     setFormData(prev => {
