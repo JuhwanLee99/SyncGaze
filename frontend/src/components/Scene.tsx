@@ -54,11 +54,14 @@ export const Scene: React.FC = () => {
   
   // Reference to GameController and weapon animation
   const gameControllerRef = useRef<{ handleTargetHit: (targetId: string) => void } | null>(null);
-  const weaponAnimRef = useRef<{ 
+  const weaponAnimRef = useRef<{
     triggerFire: (recoilMultiplier?: number) => void;
     triggerSlideBack: () => void;
     triggerReload: (isEmpty: boolean) => void;
   } | null>(null);
+
+  const { isValidationSuccessful, validationSequence } = useWebgazer();
+  const validationAutoStartRef = useRef(validationSequence);
 
   // Camera rotation tracking component
   const CameraRotationTracker = () => {
@@ -500,5 +503,3 @@ const ReloadKeyListener: React.FC<{ isActive: boolean; onReload: () => void }> =
 
   return null;
 };
-  const { isValidationSuccessful, validationSequence } = useWebgazer();
-  const validationAutoStartRef = useRef(validationSequence);

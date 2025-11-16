@@ -52,7 +52,7 @@ interface TrackingSessionState {
   activeSessionId: string | null;
 }
 
-interface TrackingSessionContextValue extends TrackingSessionState {
+export interface TrackingSessionContextValue extends TrackingSessionState {
   setSurveyResponses: (responses: SurveyResponses | null) => void;
   setConsentAccepted: (accepted: boolean) => void;
   saveCalibrationResult: (result: CalibrationResult | null) => void;
@@ -118,7 +118,7 @@ const defaultState: TrackingSessionState = {
   activeSessionId: defaultSessions[0]?.id ?? null,
 };
 
-const TrackingSessionContext = createContext<TrackingSessionContextValue | undefined>(undefined);
+export const TrackingSessionContext = createContext<TrackingSessionContextValue | undefined>(undefined);
 
 export const TrackingSessionProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<TrackingSessionState>(() => {

@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { FORBIDDEN_ZONE, TOTAL_TASKS, RECALIBRATION_THRESHOLD } from '../../features/tracking/constants';
-import { DataRecord, DotPosition, GameState, LiveGaze, TaskResult } from '../../features/tracking/types';
+import { FORBIDDEN_ZONE, TOTAL_TASKS, RECALIBRATION_THRESHOLD } from '../../features/tracker/calibration/constants';
+import { DataRecord, DotPosition, GameState, LiveGaze, TaskResult } from '../../features/tracker/calibration/types';
 
 interface WebgazerContextValue {
   gameState: GameState;

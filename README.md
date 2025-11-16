@@ -1,111 +1,60 @@
-# This branch is for develop and test of EYE and MOUSE tracking @JuhwnaLee99
-w/ node.js, WebGaze.js, React, TypeScript
+# SyncGaze Tracking Workspace
 
-# 폴더 구조
+This repository hosts two related React applications:
 
-```
-gaze-tracker-app/
-├── node_modules/
-├── public/
-├── src/
-│   ├── assets/
-│   │   └── (이미지, 폰트 등 정적 파일)
-│   │
-│   ├── components/
-│   │   └── GazeTracker/
-│   │       ├── GazeTracker.tsx        # (메인) 상태 관리 및 컴포넌트 렌더링
-│   │       ├── GazeTracker.css        # (스타일) 변경 없음
-│   │       ├── types.ts               # (타입) 모든 타입 정의
-│   │       ├── constants.ts           # (상수) 고정 값들
-│   │       ├── Instructions.tsx       # 1. 초기 안내 화면
-│   │       ├── WebcamCheck.tsx        # 2. 웹캠 확인 화면
-│   │       ├── Calibration.tsx        # 3. 캘리브레이션 화면 (추적 응시 + 지점 클릭)
-│   │       ├── Validation.tsx         # 4. 정확도 검증 화면
-│   │       ├── Task.tsx               # 5. 과제 수행 화면
-│   │       └── Results.tsx            # 6. 최종 결과 화면
-│   │
-│   ├── types/
-│   │   └── global.d.ts         # 전역 타입 정의 (window.webgazer)
-│   │
-│   ├── App.tsx                 # 최상위 컴포넌트
-│   ├── index.css               # 전역 스타일
-│   └── index.tsx               # 앱 시작점
-│
-├── .gitignore
-├── package.json
-└── tsconfig.json
+- `frontend/` – the Vite-powered demo that stitches together onboarding, consent, calibration, training and analytics flows that share a single `trackingSessionContext`.
+- `tracker-app/` – the original CRA prototype (kept for reference) that provided the first iteration of the tracker UI.
+
+## Frontend overview
+
+The new `frontend` app exposes every research step as a dedicated page while keeping shared state in `src/state/trackingSessionContext.tsx`. Feature-specific code now lives under `src/features`:
+
+- `features/onboarding/survey` centralises survey defaults, storage helpers, API calls and reusable UI such as the eligibility checklist and game selector.
+- `features/tracker/calibration` contains calibration constants, types and 2D overlay components used by the calibration page and the `useWebgazer` hook.
+
+### Local development
+
+```bash
+cd frontend
+npm install            # install/update dependencies
+npm run dev            # start Vite dev server
+npm run build          # type-check and create a production bundle
+npm run preview        # preview the production build
 ```
 
-# React + TypeScript + Vite
+### Testing workflow
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Unit tests rely on Vitest + React Testing Library and live alongside the pages they exercise, while end-to-end coverage is provided by Cypress.
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run test           # run the Vitest suite once
+npm run test:watch     # watch mode for rapid UI iteration
+npm run test:e2e       # execute Cypress specs in headless mode
+npm run test:e2e:open  # launch the Cypress runner UI
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+> **Note:** When running inside restricted environments you may need to configure npm/yarn to use an allow-listed registry or install the dev dependencies from an internal mirror before running the commands above.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## QA checklist
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+The following manual checklist keeps regressions away from critical study flows:
+
+- [ ] **Webcam permission gate** – the calibration page (`/calibration`) must request camera access before transitioning away from the idle instructions, and gracefully handle rejected permissions.
+- [ ] **Recalibration loop** – when `Validation` reports an error greater than `RECALIBRATION_THRESHOLD`, clicking “Recalibrate” should reset validation stats, clear gaze data and relaunch the dot sequence.
+- [ ] **Survey gating** – age/webcam toggles and the “해당 없음” option in the screening survey should block submission and display the validation banner until all conditions are satisfied.
+- [ ] **Consent synchronisation** – toggling the consent checkbox in `/tracker-app` must immediately update the consent step inside `/tracker-flow` and persist after a reload.
+- [ ] **Session context persistence** – completing (or skipping) calibration, training or results should update `trackingSessionState` in `localStorage` so that `/tracker-flow` reflects real progress after reloading the page or switching tabs.
+- [ ] **CSV export & upload** – from `/results`, trigger “Download CSV” and the optional upload flag to confirm `exportSessionData` attaches survey + consent metadata and handles upload failures with the toast messaging.
+- [ ] **Webcam re-alignment** – verify the calibration task overlay properly follows the cursor and that the task phase advances when all dots are clicked.
+- [ ] **Cypress journey** – run the `trackerFlow.cy.ts` spec to cover the full survey → consent → tracker → training → results flow using the shared session context.
+
+## Tracker flow scenario
+
+The Cypress spec (`frontend/cypress/e2e/trackerFlow.cy.ts`) automates the critical happy path:
+
+1. Complete the screening survey and land on `/tracker-flow`.
+2. Jump into `/tracker-app`, accept consent and return to the tracker overview.
+3. Patch the calibration summary (mirroring the skip/test button) and start a training session to ensure the HUD renders.
+4. Inject a mock training session so that `/results` can be opened without waiting for live data, then verify the analytics cards.
+
+Keeping this script green alongside the Vitest coverage ensures that onboarding, consent, calibration, training and reporting remain wired together as a single experience.

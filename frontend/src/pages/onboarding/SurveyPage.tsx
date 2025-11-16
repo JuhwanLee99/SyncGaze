@@ -1,7 +1,9 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTrackingSession, SurveyResponses } from '../../state/trackingSessionContext';
 import {
+  EligibilityChecklist,
+  GamePreferenceSelector,
   clearSurveyDraft,
   defaultSurveyResponses,
   getRankExamples,
@@ -11,7 +13,7 @@ import {
   submitSurveyResponses,
   surveyGameOptions,
   validateSurveyResponses,
-} from '../../utils/onboarding';
+} from '../../features/onboarding/survey';
 import './SurveyPage.css';
 
 const SurveyPage = () => {
@@ -42,8 +44,7 @@ const SurveyPage = () => {
 
   const isReadyToSubmit = useMemo(() => !validateSurveyResponses(formData), [formData]);
 
-  const handleEligibilityToggle = (field: 'ageCheck' | 'webcamCheck') => (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { checked } = event.target;
+  const handleEligibilityToggle = (field: 'ageCheck' | 'webcamCheck', checked: boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: checked,
@@ -51,7 +52,7 @@ const SurveyPage = () => {
   };
 
   const handleGeneralChange = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = event.target;
     setFormData(prev => ({
@@ -151,14 +152,14 @@ const SurveyPage = () => {
           <form className="survey-form" onSubmit={handleSubmit}>
             <fieldset>
               <legend>기본 자격</legend>
-              <label className="checkbox-row">
-                <input type="checkbox" checked={formData.ageCheck} onChange={handleEligibilityToggle('ageCheck')} />
-                Q1. 만 18세 이상이며 연구 목적을 이해하고 자발적으로 참여합니다.
-              </label>
-              <label className="checkbox-row">
-                <input type="checkbox" checked={formData.webcamCheck} onChange={handleEligibilityToggle('webcamCheck')} />
-                Q2. 연구에 사용할 수 있는 작동하는 PC/노트북 웹캠이 있습니다.
-              </label>
+              <EligibilityChecklist
+                values={{ ageCheck: formData.ageCheck, webcamCheck: formData.webcamCheck }}
+                onToggle={handleEligibilityToggle}
+                labelOverrides={{
+                  ageCheck: 'Q1. 만 18세 이상이며 연구 목적을 이해하고 자발적으로 참여합니다.',
+                  webcamCheck: 'Q2. 연구에 사용할 수 있는 작동하는 PC/노트북 웹캠이 있습니다.',
+                }}
+              />
             </fieldset>
 
             <fieldset>
@@ -166,19 +167,12 @@ const SurveyPage = () => {
               <p className="question-title">
                 Q3. 지난 6개월간 다음 FPS 게임 중 하나 이상을 주 5시간 이상 플레이했습니까? (복수 선택 가능)
               </p>
-              <div className="chip-grid">
-                {surveyGameOptions.map(game => (
-                  <button
-                    key={game}
-                    type="button"
-                    className={`chip ${formData.gamesPlayed.includes(game) ? 'selected' : ''}`}
-                    onClick={() => handleGameToggle(game)}
-                  >
-                    {game}
-                    {game === '해당 없음' && <span className="chip-note">선택 시 탈락</span>}
-                  </button>
-                ))}
-              </div>
+              <GamePreferenceSelector
+                options={surveyGameOptions}
+                selectedGames={formData.gamesPlayed}
+                onToggle={handleGameToggle}
+                exclusiveOption="해당 없음"
+              />
             </fieldset>
 
             <fieldset>

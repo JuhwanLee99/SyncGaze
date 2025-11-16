@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './TrackerAppPage.css';
 import {
@@ -6,10 +6,12 @@ import {
   useTrackingSession,
 } from '../state/trackingSessionContext';
 import {
+  EligibilityChecklist,
+  GamePreferenceSelector,
   defaultSurveyResponses,
   playTimeOptions,
   validateSurveyResponses,
-} from '../utils/onboarding';
+} from '../features/onboarding/survey';
 
 const gameOptions = ['Valorant', 'CS:GO / CS2', 'Apex 레전드', '기타'];
 
@@ -34,6 +36,13 @@ const TrackerAppPage = () => {
 
   const isSurveyComplete = useMemo(() => !validateSurveyResponses(formData), [formData]);
 
+  const handleEligibilityToggle = (field: 'ageCheck' | 'webcamCheck', checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: checked,
+    }));
+  };
+
   const handleGameToggle = (game: string) => {
     setFormData(prev => {
       const exists = prev.gamesPlayed.includes(game);
@@ -54,7 +63,7 @@ const TrackerAppPage = () => {
     alert('설문 응답이 저장되었습니다.');
   };
 
-  const handleConsentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleConsentChange = (event: ChangeEvent<HTMLInputElement>) => {
     setConsentAccepted(event.target.checked);
   };
 
@@ -86,37 +95,22 @@ const TrackerAppPage = () => {
           </div>
 
           <form className="survey-form" onSubmit={handleSurveySubmit}>
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={formData.ageCheck}
-                onChange={event => setFormData(prev => ({ ...prev, ageCheck: event.target.checked }))}
-              />
-              만 18세 이상이며 참여 의사를 확인했습니다.
-            </label>
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={formData.webcamCheck}
-                onChange={event => setFormData(prev => ({ ...prev, webcamCheck: event.target.checked }))}
-              />
-              연구에 사용할 수 있는 웹캠이 있습니다.
-            </label>
+            <EligibilityChecklist
+              values={{ ageCheck: formData.ageCheck, webcamCheck: formData.webcamCheck }}
+              onToggle={handleEligibilityToggle}
+              labelOverrides={{
+                ageCheck: '만 18세 이상이며 참여 의사를 확인했습니다.',
+                webcamCheck: '연구에 사용할 수 있는 웹캠이 있습니다.',
+              }}
+            />
 
             <div className="form-field">
               <span>주로 플레이하는 FPS 게임</span>
-              <div className="chip-grid">
-                {gameOptions.map(game => (
-                  <button
-                    type="button"
-                    key={game}
-                    className={`chip ${formData.gamesPlayed.includes(game) ? 'selected' : ''}`}
-                    onClick={() => handleGameToggle(game)}
-                  >
-                    {game}
-                  </button>
-                ))}
-              </div>
+              <GamePreferenceSelector
+                options={gameOptions}
+                selectedGames={formData.gamesPlayed}
+                onToggle={handleGameToggle}
+              />
             </div>
 
             <div className="form-field">
