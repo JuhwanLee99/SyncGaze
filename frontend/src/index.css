@@ -8,7 +8,8 @@
 body {
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  min-height: 100vh;
+  overflow-x: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
@@ -17,6 +18,6 @@ body {
 }
 
 #root {
-  width: 100vw;
-  height: 100vh;
+  min-height: 100vh;
+  width: 100%;
 }
