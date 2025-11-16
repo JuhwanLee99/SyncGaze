@@ -118,7 +118,7 @@ const SurveyPage = () => {
         alert('백엔드 API 호출에 실패했지만 데모 모드로 다음 단계로 이동합니다.');
       }
 
-      navigate('/tracker-flow');
+      navigate('/onboarding/consent');
     } finally {
       setIsSubmitting(false);
     }

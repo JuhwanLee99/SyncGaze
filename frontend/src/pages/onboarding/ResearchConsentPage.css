@@ -1,0 +1,93 @@
+.research-consent-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at top, #1f1b4a, #0c0f23 70%);
+  padding: 2rem;
+}
+
+.research-consent-card {
+  width: min(920px, 100%);
+  background: rgba(6, 10, 35, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: 2.5rem;
+  color: #f5f5ff;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+}
+
+.research-consent-card .eyebrow {
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.25rem;
+  color: #8ab4ff;
+}
+
+.research-consent-card h1 {
+  margin: 0.5rem 0 1rem;
+  font-size: 2.6rem;
+}
+
+.research-consent-card .lead {
+  font-size: 1.2rem;
+  color: #d8daf8;
+  margin-bottom: 2rem;
+}
+
+.research-overview,
+.consent-checklist {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 1.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.research-overview ul {
+  margin: 1rem 0 0;
+  padding-left: 1.25rem;
+  line-height: 1.6;
+  color: #dfe0ff;
+}
+
+.privacy-callout {
+  padding: 1.25rem 1.5rem;
+  border-radius: 14px;
+  background: rgba(33, 150, 243, 0.12);
+  border: 1px solid rgba(33, 150, 243, 0.45);
+  color: #d5ecff;
+  margin-bottom: 1.5rem;
+}
+
+.consent-checklist label {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.consent-checklist input[type='checkbox'] {
+  margin-top: 0.3rem;
+}
+
+.error-banner {
+  background: rgba(255, 99, 99, 0.18);
+  border: 1px solid rgba(255, 99, 99, 0.55);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  color: #ffd7d7;
+  margin-bottom: 1.5rem;
+}
+
+.consent-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.consent-actions .secondary-button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
