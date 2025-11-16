@@ -30,7 +30,7 @@ export const useTrackingSystem = ({ isActive, phase }: UseTrackingSystemProps) =
   // Load WebGazer script
   useEffect(() => {
     const script = document.createElement('script');
-    script.src = '/webgazer.js';
+    script.src = 'https://webgazer.cs.brown.edu/webgazer.js';
     script.async = true;
     script.onload = () => {
       if (window.webgazer) {
