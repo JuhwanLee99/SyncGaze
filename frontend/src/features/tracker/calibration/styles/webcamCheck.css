@@ -33,8 +33,7 @@
   color: #e4e4ff;
 }
 
-.quality-selector,
-.regression-selector {
+.quality-selector {
   margin-top: 2rem;
 }
 
@@ -67,20 +66,6 @@
   border-color: #8ab4ff;
   background: rgba(138, 180, 255, 0.12);
   transform: translateY(-2px);
-}
-
-.regression-options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.regression-options label {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  color: #e4e4ff;
 }
 
 .detection-status {

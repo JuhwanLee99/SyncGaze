@@ -7,7 +7,6 @@ import {
   LiveGaze,
   TaskResult,
   QualitySetting,
-  RegressionModel,
 } from '../../features/tracker/calibration/types';
 
 interface WebgazerContextValue {
@@ -23,11 +22,9 @@ interface WebgazerContextValue {
   isValidationSuccessful: boolean;
   validationSequence: number;
   quality: QualitySetting;
-  regressionModel: RegressionModel;
   isFaceDetected: boolean;
   startSession: () => void;
   setQuality: (quality: QualitySetting) => void;
-  setRegressionModel: (model: RegressionModel) => void;
   handleCalibrationComplete: () => void;
   handleWebcamCheckComplete: () => void;
   startValidation: () => void;
@@ -58,14 +55,10 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
   const [taskResults, setTaskResults] = useState<TaskResult[]>([]);
   const [isValidationSuccessful, setIsValidationSuccessful] = useState(false);
   const [validationSequence, setValidationSequence] = useState(0);
-  const [quality, setQuality] = useState<QualitySetting>('medium');
-  const [regressionModel, setRegressionModel] = useState<RegressionModel>('ridge');
+  const [quality, setQuality] = useState<QualitySetting>('high');
   const [isFaceDetected, setIsFaceDetected] = useState(false);
   const updateQuality = useCallback((nextQuality: QualitySetting) => {
     setQuality(nextQuality);
-  }, []);
-  const updateRegressionModel = useCallback((nextModel: RegressionModel) => {
-    setRegressionModel(nextModel);
   }, []);
 
   const collectedData = useRef<DataRecord[]>([]);
@@ -177,9 +170,9 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
         },
       });
     }
-    window.webgazer.setRegression(regressionModel);
+    window.webgazer.setRegression('ridge');
     setGameState('calibrating');
-  }, [quality, regressionModel]);
+  }, [quality]);
 
   const startValidation = useCallback(() => {
     setValidationError(null);
@@ -395,11 +388,9 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     isValidationSuccessful,
     validationSequence,
     quality,
-    regressionModel,
     isFaceDetected,
     startSession,
     setQuality: updateQuality,
-    setRegressionModel: updateRegressionModel,
     handleCalibrationComplete,
     handleWebcamCheckComplete,
     startValidation,

@@ -27,8 +27,6 @@ const CalibrationPage = () => {
     handleCalibrationComplete,
     quality,
     setQuality,
-    regressionModel,
-    setRegressionModel,
     isFaceDetected,
     handleWebcamCheckComplete,
     startValidation,
@@ -134,8 +132,6 @@ const CalibrationPage = () => {
             <WebcamCheck
               quality={quality}
               onQualityChange={setQuality}
-              regressionModel={regressionModel}
-              onRegressionChange={setRegressionModel}
               isFaceDetected={isFaceDetected}
               onConfirm={handleWebcamCheckComplete}
             />

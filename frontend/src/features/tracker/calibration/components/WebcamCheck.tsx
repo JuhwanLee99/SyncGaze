@@ -1,11 +1,9 @@
-import { RegressionModel, QualitySetting } from '../types';
+import { QualitySetting } from '../types';
 import '../styles/webcamCheck.css';
 
 type WebcamCheckProps = {
   quality: QualitySetting;
   onQualityChange: (quality: QualitySetting) => void;
-  regressionModel: RegressionModel;
-  onRegressionChange: (model: RegressionModel) => void;
   isFaceDetected: boolean;
   onConfirm: () => void;
 };
@@ -13,8 +11,6 @@ type WebcamCheckProps = {
 const WebcamCheck = ({
   quality,
   onQualityChange,
-  regressionModel,
-  onRegressionChange,
   isFaceDetected,
   onConfirm,
 }: WebcamCheckProps) => {
@@ -46,7 +42,7 @@ const WebcamCheck = ({
             onClick={() => onQualityChange('low')}
           >
             낮음
-            <span>저사양 PC, 640×480</span>
+            <span>저사양 PC · 640×480 · 30fps</span>
           </button>
           <button
             type="button"
@@ -54,7 +50,7 @@ const WebcamCheck = ({
             onClick={() => onQualityChange('medium')}
           >
             중간
-            <span>권장 설정, 1280×720</span>
+            <span>권장 설정 · 1280×720 · 60fps</span>
           </button>
           <button
             type="button"
@@ -62,44 +58,8 @@ const WebcamCheck = ({
             onClick={() => onQualityChange('high')}
           >
             높음
-            <span>고사양 PC, 1920×1080</span>
+            <span>기본값 · 1920×1080 · 60fps</span>
           </button>
-        </div>
-      </section>
-
-      <section className="regression-selector">
-        <h3>회귀 모델 선택</h3>
-        <div className="regression-options">
-          <label>
-            <input
-              type="radio"
-              name="regression"
-              value="ridge"
-              checked={regressionModel === 'ridge'}
-              onChange={() => onRegressionChange('ridge')}
-            />
-            Ridge — 기본 정확도
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="regression"
-              value="threadedRidge"
-              checked={regressionModel === 'threadedRidge'}
-              onChange={() => onRegressionChange('threadedRidge')}
-            />
-            Threaded Ridge — UI 지연 최소화
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="regression"
-              value="weightedRidge"
-              checked={regressionModel === 'weightedRidge'}
-              onChange={() => onRegressionChange('weightedRidge')}
-            />
-            Weighted Ridge — 빠른 적응
-          </label>
         </div>
       </section>
 
