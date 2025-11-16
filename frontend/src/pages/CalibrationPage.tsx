@@ -3,11 +3,11 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './CalibrationPage.css';
 import { useTrackingSession } from '../state/trackingSessionContext';
-import Calibration from '../features/tracking/components/Calibration';
-import Validation from '../features/tracking/components/Validation';
-import Task from '../features/tracking/components/Task';
+import Calibration from '../features/tracker/calibration/components/Calibration';
+import Validation from '../features/tracker/calibration/components/Validation';
+import Task from '../features/tracker/calibration/components/Task';
 import { useWebgazer } from '../hooks/tracking/useWebgazer';
-import { RECALIBRATION_THRESHOLD } from '../features/tracking/constants';
+import { RECALIBRATION_THRESHOLD } from '../features/tracker/calibration/constants';
 
 const CalibrationPage = () => {
   const navigate = useNavigate();
