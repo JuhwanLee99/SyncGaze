@@ -2,11 +2,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './CalibrationPage.css';
+import { useTrackingSession } from '../state/trackingSessionContext';
 
 // WebGazer is already declared globally in other components
 
 const CalibrationPage = () => {
   const navigate = useNavigate();
+  const { saveCalibrationResult } = useTrackingSession();
   const [isWebGazerLoaded, setIsWebGazerLoaded] = useState(false);
   const [calibrationStage, setCalibrationStage] = useState<'loading' | 'instructions' | 'calibrating' | 'validation' | 'complete'>('loading');
   const [validationError, setValidationError] = useState<number | null>(null);
@@ -44,11 +46,12 @@ const CalibrationPage = () => {
 
   const handleStartCalibration = () => {
     if (!window.webgazer) return;
-    
+
     try {
       window.webgazer.begin();
       window.webgazer.showPredictionPoints(true);
       setCalibrationStage('calibrating');
+      saveCalibrationResult({ status: 'in-progress', validationError: null });
     } catch (error) {
       console.error('Failed to start WebGazer:', error);
       alert('Failed to start eye tracking. Please allow camera access.');
@@ -68,6 +71,11 @@ const CalibrationPage = () => {
         const mockError = Math.random() * 150; // 0-150px error
         setValidationError(mockError);
         setCalibrationStage('complete');
+        saveCalibrationResult({
+          status: 'validated',
+          validationError: mockError,
+          completedAt: new Date().toISOString(),
+        });
       }, 3000);
     }
   };
@@ -82,10 +90,16 @@ const CalibrationPage = () => {
     }
     setValidationError(null);
     setCalibrationStage('instructions');
+    saveCalibrationResult(null);
   };
 
   const handleSkipCalibration = () => {
     // For testing purposes - skip calibration
+    saveCalibrationResult({
+      status: 'skipped',
+      validationError: null,
+      completedAt: new Date().toISOString(),
+    });
     navigate('/training');
   };
 
