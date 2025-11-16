@@ -15,6 +15,7 @@ import { CS2Physics } from '../utils/cs2Physics';
 import { useTrackingSystem } from './TrackingIntegration';
 import { CalibrationOverlay, ValidationOverlay } from './CalibrationOverlay';
 import { LiveGaze } from '../types/calibration'; // NEW IMPORT
+import { useWebgazer } from '../hooks/tracking/useWebgazer';
 
 type Phase = 'idle' | 'calibration' | 'confirmValidation' | 'validation' | 'training' | 'complete';
 
@@ -182,6 +183,29 @@ export const Scene: React.FC = () => {
     recalibrate();
     setPhase('calibration');
   };
+
+  useEffect(() => {
+    if (
+      isValidationSuccessful &&
+      validationSequence > validationAutoStartRef.current &&
+      phase !== 'training' &&
+      isWebGazerReady
+    ) {
+      validationAutoStartRef.current = validationSequence;
+      clearData();
+      setScore(0);
+      setPhase('training');
+      startTimeRef.current = performance.now();
+      requestPointerLock();
+    }
+  }, [
+    isValidationSuccessful,
+    validationSequence,
+    phase,
+    clearData,
+    isWebGazerReady,
+    requestPointerLock,
+  ]);
 
   const handlePhysicsUpdate = (position: THREE.Vector3, vel: THREE.Vector3, physics: CS2Physics) => {
     setPlayerPosition(position);
@@ -476,3 +500,5 @@ const ReloadKeyListener: React.FC<{ isActive: boolean; onReload: () => void }> =
 
   return null;
 };
+  const { isValidationSuccessful, validationSequence } = useWebgazer();
+  const validationAutoStartRef = useRef(validationSequence);

@@ -15,6 +15,7 @@ declare global {
       setTracker(tracker: string): void;
       setRegression(regression: string): void;
       applyKalmanFilter(apply: boolean): void;
+      recordScreenPosition?: (x: number, y: number, type?: string) => void;
       params?: {
         checkClick?: boolean;
         checkMove?: boolean;

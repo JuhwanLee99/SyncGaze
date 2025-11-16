@@ -1,5 +1,5 @@
 // src/pages/TrainingPage.tsx
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Scene } from '../components/Scene';
 import './TrainingPage.css';
@@ -8,6 +8,7 @@ import {
   TrainingSessionSummary,
   useTrackingSession,
 } from '../state/trackingSessionContext';
+import { useWebgazer } from '../hooks/tracking/useWebgazer';
 
 const TrainingPage = () => {
   const navigate = useNavigate();
@@ -49,14 +50,17 @@ const TrainingPage = () => {
     return () => clearInterval(interval);
   }, [isTraining, isComplete]);
 
-  const handleStartTraining = () => {
+  const { isValidationSuccessful, validationSequence } = useWebgazer();
+  const validationTriggerRef = useRef(validationSequence);
+
+  const handleStartTraining = useCallback(() => {
     setIsTraining(true);
     setIsComplete(false);
     startTimeRef.current = Date.now();
     trainingDataRef.current = [];
     setScore(0);
     setTimeRemaining(60);
-  };
+  }, []);
 
   const summarizeTrainingData = useMemo(() => {
     return (data: TrainingDataPoint[]) => {
@@ -158,6 +162,22 @@ const TrainingPage = () => {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  useEffect(() => {
+    if (
+      isValidationSuccessful &&
+      validationSequence > validationTriggerRef.current &&
+      !isTraining
+    ) {
+      validationTriggerRef.current = validationSequence;
+      handleStartTraining();
+    }
+  }, [
+    isValidationSuccessful,
+    validationSequence,
+    handleStartTraining,
+    isTraining,
+  ]);
 
   return (
     <div className="training-page">
