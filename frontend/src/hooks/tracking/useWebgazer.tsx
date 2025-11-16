@@ -44,6 +44,20 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
   const validationGazePoints = useRef<{ x: number; y: number }[]>([]);
   const taskStartTime = useRef<number | null>(null);
   const taskStartTimes = useRef<Record<number, number>>({});
+  const hasWebgazerStarted = useRef(false);
+
+  const safelyEndWebgazer = useCallback(() => {
+    if (!window.webgazer || !hasWebgazerStarted.current) {
+      return;
+    }
+    try {
+      window.webgazer.end();
+    } catch (error) {
+      console.error('Failed to stop WebGazer', error);
+    } finally {
+      hasWebgazerStarted.current = false;
+    }
+  }, []);
 
   useEffect(() => {
     const script = document.createElement('script');
@@ -59,11 +73,9 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       document.body.removeChild(script);
-      if (window.webgazer) {
-        window.webgazer.end();
-      }
+      safelyEndWebgazer();
     };
-  }, []);
+  }, [safelyEndWebgazer]);
 
   useEffect(() => {
     if (!isReady || !window.webgazer) {
@@ -95,6 +107,7 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
       window.webgazer.params.checkMove = false;
     }
     window.webgazer.begin();
+    hasWebgazerStarted.current = true;
     window.webgazer.applyKalmanFilter(USE_KALMAN_FILTER);
     setGameState('calibrating');
   }, [isReady]);
@@ -167,9 +180,9 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
       setTaskCount(prev => prev + 1);
     } else {
       setGameState('finished');
-      window.webgazer.end();
+      safelyEndWebgazer();
     }
-  }, [currentDot, taskCount]);
+  }, [currentDot, taskCount, safelyEndWebgazer]);
 
   const handleCalStage3Complete = useCallback((successRate: number) => {
     setCalStage3SuccessRate(successRate);
