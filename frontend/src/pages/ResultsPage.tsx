@@ -1,5 +1,5 @@
 // src/pages/ResultsPage.tsx
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './ResultsPage.css';
 import {
@@ -7,6 +7,7 @@ import {
   TrainingSessionSummary,
   useTrackingSession,
 } from '../state/trackingSessionContext';
+import { exportSessionData } from '../utils/sessionExport';
 
 interface Analytics {
   totalTargets: number;
@@ -19,9 +20,17 @@ interface Analytics {
 
 const ResultsPage = () => {
   const navigate = useNavigate();
-  const { activeSession } = useTrackingSession();
+  const {
+    activeSession,
+    surveyResponses,
+    consentAccepted,
+    calibrationResult,
+  } = useTrackingSession();
   const [sessionData, setSessionData] = useState<TrainingSessionSummary | null>(activeSession);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!activeSession) {
@@ -70,19 +79,56 @@ const ResultsPage = () => {
     };
   };
 
-  const downloadCSV = () => {
-    if (!sessionData) return;
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = window.setTimeout(() => setToast(null), 4000);
+  }, []);
 
-    const blob = new Blob([sessionData.csvData], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `training-session-${sessionData.id}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-  };
+  useEffect(() => () => {
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+  }, []);
+
+  const handleExport = useCallback(
+    async ({ upload }: { upload?: boolean } = {}) => {
+      if (!sessionData) {
+        return;
+      }
+
+      try {
+        setIsExporting(true);
+        await exportSessionData(
+          {
+            session: sessionData,
+            surveyResponses,
+            consentAccepted,
+            calibrationResult,
+          },
+          {
+            filename: `training-session-${sessionData.id}.csv`,
+            download: true,
+            upload: Boolean(upload),
+          },
+        );
+        showToast(
+          upload
+            ? 'CSV downloaded and uploaded successfully.'
+            : 'CSV downloaded successfully.',
+          'success',
+        );
+      } catch (error) {
+        console.error('Failed to export session data', error);
+        showToast(upload ? 'CSV upload failed.' : 'CSV export failed.', 'error');
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [calibrationResult, consentAccepted, sessionData, showToast, surveyResponses],
+  );
 
   const handleTrainAgain = () => {
     navigate('/calibration');
@@ -198,8 +244,19 @@ const ResultsPage = () => {
         <section className="data-section">
           <h2>Session Data</h2>
           <div className="data-actions">
-            <button className="download-button" onClick={downloadCSV}>
-              Download CSV
+            <button
+              className="download-button"
+              onClick={() => handleExport({ upload: false })}
+              disabled={isExporting}
+            >
+              {isExporting ? 'Preparing…' : 'Download CSV'}
+            </button>
+            <button
+              className="upload-button"
+              onClick={() => handleExport({ upload: true })}
+              disabled={isExporting}
+            >
+              {isExporting ? 'Uploading…' : 'Upload to /api/upload-csv'}
             </button>
             <button className="secondary-button" onClick={handleTrainAgain}>
               Train Again
@@ -210,6 +267,11 @@ const ResultsPage = () => {
           </div>
         </section>
       </main>
+      {toast && (
+        <div className={`toast ${toast.type}`} role="status" aria-live="polite">
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 };

@@ -8,11 +8,18 @@ import {
   TrainingSessionSummary,
   useTrackingSession,
 } from '../state/trackingSessionContext';
+import { serializeSessionToCsv } from '../utils/sessionExport';
 import { useWebgazer } from '../hooks/tracking/useWebgazer';
 
 const TrainingPage = () => {
   const navigate = useNavigate();
-  const { addSession, setActiveSessionId, calibrationResult } = useTrackingSession();
+  const {
+    addSession,
+    setActiveSessionId,
+    calibrationResult,
+    surveyResponses,
+    consentAccepted,
+  } = useTrackingSession();
   const [timeRemaining, setTimeRemaining] = useState(60);
   const [isTraining, setIsTraining] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
@@ -100,10 +107,9 @@ const TrainingPage = () => {
     setIsComplete(true);
     setIsTraining(false);
 
-    const csvData = generateCSV(trainingDataRef.current);
     const analytics = summarizeTrainingData(trainingDataRef.current);
 
-    const sessionRecord: TrainingSessionSummary = {
+    const baseSessionRecord: TrainingSessionSummary = {
       id: Date.now().toString(),
       date: new Date().toISOString(),
       duration: 60,
@@ -114,27 +120,24 @@ const TrainingPage = () => {
       avgReactionTime: analytics.avgReactionTime,
       gazeAccuracy: analytics.gazeAccuracy,
       mouseAccuracy: analytics.mouseAccuracy,
-      csvData,
       rawData: trainingDataRef.current,
+      csvData: '',
+    };
+
+    const csvData = serializeSessionToCsv({
+      session: baseSessionRecord,
+      surveyResponses,
+      consentAccepted,
+      calibrationResult,
+    });
+
+    const sessionRecord: TrainingSessionSummary = {
+      ...baseSessionRecord,
+      csvData,
     };
 
     addSession(sessionRecord);
     setActiveSessionId(sessionRecord.id);
-  };
-
-  const generateCSV = (data: TrainingDataPoint[]): string => {
-    const headers = ['Timestamp', 'GazeX', 'GazeY', 'MouseX', 'MouseY', 'TargetHit', 'TargetID'];
-    const rows = data.map(d => [
-      d.timestamp,
-      d.gazeX ?? '',
-      d.gazeY ?? '',
-      d.mouseX ?? '',
-      d.mouseY ?? '',
-      d.targetHit ? 'true' : 'false',
-      d.targetId ?? '',
-    ]);
-
-    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   };
 
   const handleViewResults = () => {
