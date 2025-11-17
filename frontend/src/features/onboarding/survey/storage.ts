@@ -1,5 +1,5 @@
 import { SurveyResponses } from '../../../state/trackingSessionContext';
-import { SURVEY_SESSION_KEY } from './constants';
+import { SURVEY_SESSION_KEY, defaultSurveyResponses } from './constants';
 
 const isBrowser = typeof window !== 'undefined';
 
@@ -9,7 +9,11 @@ export const loadSurveyFromSession = (): SurveyResponses | null => {
   }
   try {
     const stored = window.sessionStorage.getItem(SURVEY_SESSION_KEY);
-    return stored ? (JSON.parse(stored) as SurveyResponses) : null;
+    if (!stored) {
+      return null;
+    }
+    const parsed = JSON.parse(stored) as Partial<SurveyResponses>;
+    return { ...defaultSurveyResponses, ...parsed } as SurveyResponses;
   } catch (error) {
     console.warn('Failed to load survey draft from sessionStorage', error);
     return null;

@@ -82,7 +82,7 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const script = document.createElement('script');
-    script.src = 'https://webgazer.cs.brown.edu/webgazer.js';
+    script.src = '/webgazer.js';
     script.async = true;
     script.onload = () => setIsReady(true);
     script.onerror = () => {

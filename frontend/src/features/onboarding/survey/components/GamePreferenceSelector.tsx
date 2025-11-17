@@ -1,8 +1,9 @@
+import { SurveyGameOption } from '../constants';
+
 interface GamePreferenceSelectorProps {
-  options: string[];
+  options: SurveyGameOption[];
   selectedGames: string[];
   onToggle: (game: string) => void;
-  exclusiveOption?: string;
   exclusiveNote?: string;
 }
 
@@ -10,26 +11,38 @@ const GamePreferenceSelector = ({
   options,
   selectedGames,
   onToggle,
-  exclusiveOption,
   exclusiveNote = '선택 시 탈락',
 }: GamePreferenceSelectorProps) => {
+  const categories = Array.from(new Set(options.map(option => option.category)));
+
   return (
     <div className="chip-grid">
-      {options.map(game => {
-        const isSelected = selectedGames.includes(game);
-        const shouldShowNote = exclusiveOption && game === exclusiveOption;
-        return (
-          <button
-            key={game}
-            type="button"
-            className={`chip ${isSelected ? 'selected' : ''}`}
-            onClick={() => onToggle(game)}
-          >
-            {game}
-            {shouldShowNote && <span className="chip-note">{exclusiveNote}</span>}
-          </button>
-        );
-      })}
+      {categories.map(category => (
+        <div key={category} className="chip-group">
+          <p className="hint-text">[{category}]</p>
+          <div className="chip-grid">
+            {options
+              .filter(option => option.category === category)
+              .map(option => {
+                const isSelected = selectedGames.includes(option.value);
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`chip ${isSelected ? 'selected' : ''}`}
+                    onClick={() => onToggle(option.value)}
+                  >
+                    {option.label}
+                    {option.exclusive && <span className="chip-note">{exclusiveNote}</span>}
+                    {option.requiresDetail && (
+                      <span className="chip-note">주력 FPS 직접 기재</span>
+                    )}
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 };

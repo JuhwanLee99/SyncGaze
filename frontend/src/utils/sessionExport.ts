@@ -4,6 +4,7 @@ import {
   TrainingDataPoint,
   TrainingSessionSummary,
 } from '../state/trackingSessionContext';
+import { findGameOption, OTHER_GAME_VALUE } from '../features/onboarding/survey';
 
 export interface SessionExportTaskResult {
   taskId: string | number;
@@ -67,6 +68,10 @@ const convertTrainingData = (data: TrainingDataPoint[]): SessionExportRawDatum[]
     targetHit: point.targetHit,
   }));
 
+const formatGameLabel = (value: string): string => findGameOption(value)?.label ?? value;
+
+const formatGamesList = (values: string[]): string => values.map(formatGameLabel).join('; ');
+
 export const serializeSessionToCsv = ({
   session,
   surveyResponses,
@@ -89,11 +94,17 @@ export const serializeSessionToCsv = ({
   ];
 
   if (surveyResponses) {
+    const mainGameLabel = surveyResponses.mainGame ? formatGameLabel(surveyResponses.mainGame) : '';
+    const mainGameDetail =
+      surveyResponses.mainGame === OTHER_GAME_VALUE ? surveyResponses.mainGameOther || 'N/A' : 'N/A';
+
     participantMeta.push(
       `# Survey Age Check: ${formatBoolean(surveyResponses.ageCheck)}`,
       `# Survey Webcam Check: ${formatBoolean(surveyResponses.webcamCheck)}`,
-      `# Survey Games Played: ${surveyResponses.gamesPlayed.join('; ') || 'N/A'}`,
-      `# Survey Main Game: ${surveyResponses.mainGame || 'N/A'}`,
+      `# Survey Games Played: ${formatGamesList(surveyResponses.gamesPlayed) || 'N/A'}`,
+      `# Survey Main Game: ${mainGameLabel || 'N/A'}`,
+      `# Survey Main Game (Other): ${mainGameDetail}`,
+      `# Survey Aim Trainer Usage: ${surveyResponses.aimTrainerUsage || 'N/A'}`,
       `# Survey Rank: ${surveyResponses.inGameRank || 'N/A'}`,
       `# Survey Play Time: ${surveyResponses.playTime || 'N/A'}`,
       `# Survey Self-Assessment: ${surveyResponses.selfAssessment ?? 'N/A'}`,

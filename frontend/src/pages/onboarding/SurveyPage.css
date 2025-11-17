@@ -98,6 +98,17 @@ legend {
   gap: 12px;
 }
 
+.chip-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.chip-group + .chip-group {
+  margin-top: 12px;
+}
+
 .chip {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.15);

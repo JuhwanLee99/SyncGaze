@@ -30,8 +30,10 @@ export const createTrackingSessionValue = (
 export const buildSurveyResponses = (overrides: Partial<SurveyResponses> = {}): SurveyResponses => ({
   ageCheck: true,
   webcamCheck: true,
-  gamesPlayed: ['Valorant'],
-  mainGame: 'Valorant',
+  gamesPlayed: ['valorant'],
+  mainGame: 'valorant',
+  mainGameOther: '',
+  aimTrainerUsage: 'yes',
   inGameRank: 'Immortal',
   playTime: '< 100시간',
   selfAssessment: 5,
