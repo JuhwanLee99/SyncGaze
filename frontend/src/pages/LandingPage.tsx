@@ -1,10 +1,13 @@
 // src/pages/LandingPage.tsx
 import { useNavigate } from 'react-router-dom';
+import { useRef } from 'react';
 import './LandingPage.css';
 import DarkVeilBackground from '../components/DarkVeil';
+import Crosshair from '../components/ScreenCrosshair';
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const ctaSectionRef = useRef<HTMLElement>(null);
 
   return (
     <div className="landing-page">
@@ -107,8 +110,9 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="cta-section">
+      {/* CTA Section with Crosshair */}
+      <section ref={ctaSectionRef} className="cta-section">
+        <Crosshair containerRef={ctaSectionRef} color='#ffffff'  circleRadius={50}/>
         <h2>Ready to Level Up Your Aim?</h2>
         <p>Join thousands of users improving their performance</p>
         <button className="primary-button large" onClick={() => navigate('/auth')}>

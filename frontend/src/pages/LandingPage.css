@@ -271,6 +271,8 @@
 
 /* CTA Section */
 .cta-section {
+  position: relative;
+  overflow: hidden; /* Important: keeps crosshair within bounds */
   padding: 6rem 4rem;
   text-align: center;
   background: rgba(15, 12, 41, 0.6); /* Semi-transparent dark background */
@@ -286,6 +288,11 @@
   font-size: 1.2rem;
   color: #b8b8d1;
   margin-bottom: 2.5rem;
+}
+
+.cta-section button {
+  position: relative;
+  z-index: 10; /* Ensures text stays above crosshair */
 }
 
 /* Footer */
