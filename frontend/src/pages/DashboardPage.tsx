@@ -73,7 +73,13 @@ const DashboardPage = () => {
       {/* Header */}
       <header className="dashboard-header">
         <div className="header-content">
-          <h1 className="dashboard-logo">AimTracker</h1>
+          <button
+            type="button"
+            className="dashboard-logo"
+            onClick={() => navigate('/dashboard')}
+          >
+            SyncGaze
+          </button>
           <div className="header-actions">
             <div className="calibration-status">{calibrationMessage}</div>
             <span className="user-email">{userEmail}</span>

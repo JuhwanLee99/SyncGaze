@@ -45,7 +45,7 @@ const AuthPage = () => {
         {/* Left side - Branding */}
         <div className="auth-branding">
           <div className="branding-content">
-            <h1 className="brand-logo">AimTracker</h1>
+            <h1 className="brand-logo">SyncGaze</h1>
             <p className="brand-tagline">
               Elevate your aim with AI-powered eye tracking technology
             </p>
