@@ -1,16 +1,32 @@
 // src/pages/LandingPage.tsx
 import { useNavigate } from 'react-router-dom';
+import { useRef } from 'react';
 import './LandingPage.css';
+import DarkVeilBackground from '../components/DarkVeil';
+import Crosshair from '../components/ScreenCrosshair';
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const ctaSectionRef = useRef<HTMLElement>(null);
 
   return (
     <div className="landing-page">
+        <div className="dark-veil-container">
+        <DarkVeilBackground 
+          hueShift={0}
+          noiseIntensity={0.02}
+          scanlineIntensity={0.1}
+          speed={0.5}
+          scanlineFrequency={2}
+          warpAmount={0.3}
+          resolutionScale={1}
+        />
+      </div>
+    <div className="landing-content">
       {/* Hero Section */}
       <header className="hero">
         <nav className="navbar">
-          <div className="logo">AimTracker</div>
+          <div className="logo">SyncGaze</div>
           <button className="nav-button" onClick={() => navigate('/auth')}>
             Sign In
           </button>
@@ -36,28 +52,28 @@ const LandingPage = () => {
 
       {/* Features Section */}
       <section id="features" className="features">
-        <h2>Why Choose AimTracker?</h2>
+        <h2>Why Choose SyncGaze?</h2>
         <div className="feature-grid">
           <div className="feature-card">
-            <div className="feature-icon">👁️</div>
+          
             <h3>Eye Tracking Technology</h3>
             <p>Advanced WebGazer integration for precise gaze tracking and analysis</p>
           </div>
           
           <div className="feature-card">
-            <div className="feature-icon">📊</div>
+          
             <h3>Data-Driven Insights</h3>
             <p>Comprehensive CSV reports with visualizations of your performance metrics</p>
           </div>
           
           <div className="feature-card">
-            <div className="feature-icon">🎯</div>
+      
             <h3>Calibrated Training</h3>
             <p>Personalized calibration ensures accurate tracking tailored to you</p>
           </div>
           
           <div className="feature-card">
-            <div className="feature-icon">⚡</div>
+            
             <h3>Real-Time Feedback</h3>
             <p>60-second training sessions with instant performance tracking</p>
           </div>
@@ -94,8 +110,9 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="cta-section">
+      {/* CTA Section with Crosshair */}
+      <section ref={ctaSectionRef} className="cta-section">
+        <Crosshair containerRef={ctaSectionRef} color='#ffffff'  circleRadius={50}/>
         <h2>Ready to Level Up Your Aim?</h2>
         <p>Join thousands of users improving their performance</p>
         <button className="primary-button large" onClick={() => navigate('/auth')}>
@@ -105,8 +122,11 @@ const LandingPage = () => {
 
       {/* Footer */}
       <footer className="footer">
-        <p>&copy; 2025 AimTracker. All rights reserved.</p>
+        <p>&copy; 2025 SyncGaze. All rights reserved.</p>
       </footer>
+    </div>
+
+      
     </div>
   );
 };
