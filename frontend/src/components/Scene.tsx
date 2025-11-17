@@ -15,6 +15,7 @@ import { CS2Physics } from '../utils/cs2Physics';
 import { useTrackingSystem } from './TrackingIntegration';
 import { CalibrationOverlay, ValidationOverlay } from './CalibrationOverlay';
 import { LiveGaze } from '../types/calibration'; // NEW IMPORT
+import { useWebgazer } from '../hooks/tracking/useWebgazer';
 
 type Phase = 'idle' | 'calibration' | 'confirmValidation' | 'validation' | 'training' | 'complete';
 
@@ -53,11 +54,14 @@ export const Scene: React.FC = () => {
   
   // Reference to GameController and weapon animation
   const gameControllerRef = useRef<{ handleTargetHit: (targetId: string) => void } | null>(null);
-  const weaponAnimRef = useRef<{ 
+  const weaponAnimRef = useRef<{
     triggerFire: (recoilMultiplier?: number) => void;
     triggerSlideBack: () => void;
     triggerReload: (isEmpty: boolean) => void;
   } | null>(null);
+
+  const { isValidationSuccessful, validationSequence } = useWebgazer();
+  const validationAutoStartRef = useRef(validationSequence);
 
   // Camera rotation tracking component
   const CameraRotationTracker = () => {
@@ -182,6 +186,29 @@ export const Scene: React.FC = () => {
     recalibrate();
     setPhase('calibration');
   };
+
+  useEffect(() => {
+    if (
+      isValidationSuccessful &&
+      validationSequence > validationAutoStartRef.current &&
+      phase !== 'training' &&
+      isWebGazerReady
+    ) {
+      validationAutoStartRef.current = validationSequence;
+      clearData();
+      setScore(0);
+      setPhase('training');
+      startTimeRef.current = performance.now();
+      requestPointerLock();
+    }
+  }, [
+    isValidationSuccessful,
+    validationSequence,
+    phase,
+    clearData,
+    isWebGazerReady,
+    requestPointerLock,
+  ]);
 
   const handlePhysicsUpdate = (position: THREE.Vector3, vel: THREE.Vector3, physics: CS2Physics) => {
     setPlayerPosition(position);

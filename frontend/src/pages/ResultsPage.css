@@ -317,6 +317,39 @@
   box-shadow: 0 6px 20px rgba(78, 205, 196, 0.6);
 }
 
+.data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+
+.upload-button {
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.upload-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #4ecdc4;
+  transform: translateY(-3px);
+}
+
+.download-button:disabled,
+.upload-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 /* Actions Section */
 .actions-section {
   display: flex;
@@ -409,5 +442,37 @@
   .viz-placeholder {
     padding: 1rem;
     min-height: 200px;
+  }
+}
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.toast.success {
+  border: 1px solid rgba(78, 205, 196, 0.7);
+}
+
+.toast.error {
+  border: 1px solid rgba(255, 99, 99, 0.7);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
