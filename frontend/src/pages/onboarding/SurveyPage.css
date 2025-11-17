@@ -1,0 +1,257 @@
+.survey-page {
+  min-height: 100vh;
+  padding: 48px clamp(20px, 4vw, 80px);
+  background: linear-gradient(180deg, #05070d 0%, #0d111a 40%, #0d111a 100%);
+  color: #f5f7fa;
+}
+
+.survey-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.survey-header h1 {
+  margin: 8px 0;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+}
+
+.survey-header p {
+  margin: 0;
+  color: #aab4d4;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: #6c7cff;
+}
+
+.survey-shell {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.survey-card {
+  background: rgba(13, 17, 26, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: clamp(24px, 4vw, 40px);
+  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.35);
+}
+
+.survey-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.survey-card__header h2 {
+  margin: 0;
+}
+
+.survey-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+fieldset {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 20px;
+  margin: 0;
+  background: rgba(5, 7, 13, 0.65);
+}
+
+legend {
+  padding: 0 12px;
+  font-weight: 600;
+  color: #8ddcff;
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+
+.checkbox-row input {
+  margin-top: 4px;
+}
+
+.question-title {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.chip-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.chip-group + .chip-group {
+  margin-top: 12px;
+}
+
+.chip {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 10px 18px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.chip.selected {
+  background: rgba(108, 124, 255, 0.2);
+  border-color: #6c7cff;
+}
+
+.chip-note {
+  display: block;
+  font-size: 0.75rem;
+  margin-top: 4px;
+  color: #ffc14f;
+}
+
+.radio-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.radio-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(5, 7, 13, 0.5);
+}
+
+.radio-chip input:disabled + span {
+  opacity: 0.4;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-field input,
+.form-field select {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 12px 14px;
+  background: rgba(5, 7, 13, 0.8);
+  color: inherit;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+  outline: 2px solid #6c7cff;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slider-row input[type='range'] {
+  flex: 1;
+}
+
+.hint-text {
+  color: #aab4d4;
+  font-size: 0.9rem;
+}
+
+.form-error {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255, 99, 99, 0.15);
+  border: 1px solid rgba(255, 99, 99, 0.5);
+  color: #ff8585;
+  font-weight: 600;
+  text-align: center;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.primary-button,
+.secondary-button,
+.ghost-button {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, #6c7cff, #4cb3ff);
+  color: #05070d;
+}
+
+.secondary-button {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f5f7fa;
+}
+
+.ghost-button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: inherit;
+}
+
+.status-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.status-pill.pending {
+  background: rgba(255, 193, 79, 0.15);
+  color: #ffc14f;
+}
+
+.status-pill.success {
+  background: rgba(92, 243, 159, 0.15);
+  color: #5cf39f;
+}
+
+@media (max-width: 720px) {
+  .survey-header {
+    flex-direction: column;
+  }
+
+  fieldset {
+    padding: 16px;
+  }
+}
