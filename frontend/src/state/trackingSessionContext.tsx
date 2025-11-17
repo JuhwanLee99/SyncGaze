@@ -5,6 +5,8 @@ export interface SurveyResponses {
   webcamCheck: boolean;
   gamesPlayed: string[];
   mainGame: string;
+  mainGameOther: string;
+  aimTrainerUsage: 'yes' | 'no' | '';
   inGameRank: string;
   playTime: string;
   selfAssessment: number;

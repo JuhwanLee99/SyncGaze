@@ -7,7 +7,10 @@ import {
   clearSurveyDraft,
   defaultSurveyResponses,
   getRankExamples,
+  findGameOption,
   loadSurveyFromSession,
+  NONE_GAME_VALUE,
+  OTHER_GAME_VALUE,
   persistSurveyToSession,
   playTimeOptions,
   submitSurveyResponses,
@@ -43,6 +46,17 @@ const SurveyPage = () => {
   }, [formData]);
 
   const isReadyToSubmit = useMemo(() => !validateSurveyResponses(formData), [formData]);
+  const selectedGameOptions = useMemo(
+    () => surveyGameOptions.filter(option => formData.gamesPlayed.includes(option.value)),
+    [formData.gamesPlayed],
+  );
+  const mainGameLabel = useMemo(() => {
+    if (formData.mainGame === OTHER_GAME_VALUE) {
+      return formData.mainGameOther || '직접 입력';
+    }
+    return findGameOption(formData.mainGame)?.label ?? formData.mainGame;
+  }, [formData.mainGame, formData.mainGameOther]);
+  const isNoneSelected = formData.gamesPlayed.includes(NONE_GAME_VALUE);
 
   const handleEligibilityToggle = (field: 'ageCheck' | 'webcamCheck', checked: boolean) => {
     setFormData(prev => ({
@@ -55,34 +69,48 @@ const SurveyPage = () => {
     event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = event.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'selfAssessment' ? Number(value) : value,
-    }));
+    setFormData(prev => {
+      const nextValue = name === 'selfAssessment' ? Number(value) : value;
+      const updated = {
+        ...prev,
+        [name]: nextValue,
+      };
+
+      if (name === 'mainGame' && value !== OTHER_GAME_VALUE) {
+        return { ...updated, mainGameOther: '' };
+      }
+
+      return updated;
+    });
   };
 
   const handleGameToggle = (game: string) => {
     setFormData(prev => {
-      if (game === '해당 없음') {
+      if (game === NONE_GAME_VALUE) {
+        const alreadySelected = prev.gamesPlayed.includes(game);
         return {
           ...prev,
-          gamesPlayed: prev.gamesPlayed.includes(game) ? [] : [game],
-          mainGame: prev.gamesPlayed.includes(game) ? prev.mainGame : '',
+          gamesPlayed: alreadySelected ? [] : [game],
+          mainGame: '',
+          mainGameOther: '',
         };
       }
 
-      const filteredGames = prev.gamesPlayed.filter(item => item !== '해당 없음');
+      const filteredGames = prev.gamesPlayed.filter(item => item !== NONE_GAME_VALUE);
       const exists = filteredGames.includes(game);
       const nextGames = exists
         ? filteredGames.filter(item => item !== game)
         : [...filteredGames, game];
 
-      const mainGameStillValid = nextGames.includes(prev.mainGame);
-
+      const mainGameStillValid =
+        nextGames.includes(prev.mainGame) || prev.mainGame === OTHER_GAME_VALUE;
+      const shouldClearOtherField = !nextGames.includes(OTHER_GAME_VALUE);
       return {
         ...prev,
         gamesPlayed: nextGames,
         mainGame: mainGameStillValid ? prev.mainGame : '',
+        mainGameOther:
+          mainGameStillValid && !shouldClearOtherField ? prev.mainGameOther : '',
       };
     });
   };
@@ -156,8 +184,10 @@ const SurveyPage = () => {
                 values={{ ageCheck: formData.ageCheck, webcamCheck: formData.webcamCheck }}
                 onToggle={handleEligibilityToggle}
                 labelOverrides={{
-                  ageCheck: 'Q1. 만 18세 이상이며 연구 목적을 이해하고 자발적으로 참여합니다.',
-                  webcamCheck: 'Q2. 연구에 사용할 수 있는 작동하는 PC/노트북 웹캠이 있습니다.',
+                  ageCheck:
+                    'Q1. 귀하는 만 18세 이상이며, 본 연구의 목적을 이해하고 자발적으로 참여하는 데 동의하십니까?',
+                  webcamCheck:
+                    'Q2. 본 연구에 참여하기 위한 PC/노트북에 작동하는 웹캠이 설치되어 있습니까?',
                 }}
               />
             </fieldset>
@@ -165,35 +195,81 @@ const SurveyPage = () => {
             <fieldset>
               <legend>게임 경험</legend>
               <p className="question-title">
-                Q3. 지난 6개월간 다음 FPS 게임 중 하나 이상을 주 5시간 이상 플레이했습니까? (복수 선택 가능)
+                Q3. 지난 6개월간 다음 FPS 게임 중 하나 이상을 주 5시간 이상 정기적으로
+                플레이했습니까?
+                <br />
+                <span className="hint-text">주요 장르별 분류, 중복 선택 가능</span>
               </p>
               <GamePreferenceSelector
                 options={surveyGameOptions}
                 selectedGames={formData.gamesPlayed}
                 onToggle={handleGameToggle}
-                exclusiveOption="해당 없음"
               />
+              <p className="hint-text">* "위 목록에 없음" 선택 시 주력 FPS를 직접 기입해주세요.</p>
             </fieldset>
 
             <fieldset>
               <legend>주력 게임</legend>
-              <p className="question-title">Q4. 위 게임 중 귀하의 주력 게임은 무엇입니까?</p>
-              <div className="radio-grid">
-                {surveyGameOptions
-                  .filter(game => game !== '해당 없음')
-                  .map(game => (
-                    <label key={game} className="radio-chip">
-                      <input
-                        type="radio"
-                        name="mainGame"
-                        value={game}
-                        checked={formData.mainGame === game}
-                        onChange={handleGeneralChange}
-                        disabled={!formData.gamesPlayed.includes(game)}
-                      />
-                      <span>{game}</span>
-                    </label>
+              <p className="question-title">
+                Q4. (질문 3에서 선택한 게임 중) 귀하의 "주력 게임"(가장 자신 있거나 시간을 많이
+                투자한 게임)은 무엇입니까?
+              </p>
+              <label className="form-field" htmlFor="mainGame">
+                <span>드롭다운 메뉴: 질문 3에서 선택한 모든 게임</span>
+                <select
+                  id="mainGame"
+                  name="mainGame"
+                  value={formData.mainGame}
+                  onChange={handleGeneralChange}
+                  disabled={isNoneSelected || selectedGameOptions.length === 0}
+                >
+                  <option value="">주력 게임을 선택하세요</option>
+                  {selectedGameOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
                   ))}
+                </select>
+              </label>
+              {formData.mainGame === OTHER_GAME_VALUE && (
+                <label className="form-field" htmlFor="mainGameOther">
+                  <span>위 목록에 없음: 플레이하는 주력 FPS를 입력해주세요.</span>
+                  <input
+                    id="mainGameOther"
+                    name="mainGameOther"
+                    value={formData.mainGameOther}
+                    onChange={handleGeneralChange}
+                    placeholder="예: Escape from Tarkov Arena"
+                  />
+                </label>
+              )}
+              <div className="form-field">
+                <span className="question-title">
+                  Q5. 지난 6개월간 Aim Trainer(예: KovaaK's, Aim Lab)를 정기적으로 사용했습니까?
+                </span>
+                <div className="radio-grid">
+                  <label className="radio-chip">
+                    <input
+                      type="radio"
+                      name="aimTrainerUsage"
+                      value="yes"
+                      checked={formData.aimTrainerUsage === 'yes'}
+                      onChange={handleGeneralChange}
+                    />
+                    <span>예</span>
+                  </label>
+                  <label className="radio-chip">
+                    <input
+                      type="radio"
+                      name="aimTrainerUsage"
+                      value="no"
+                      checked={formData.aimTrainerUsage === 'no'}
+                      onChange={handleGeneralChange}
+                    />
+                    <span>아니오</span>
+                  </label>
+                </div>
+                <p className="hint-text">Aim Trainer 사용 여부는 스킬 분석의 중요한 변수가 될 수 있습니다.</p>
               </div>
             </fieldset>
 
@@ -202,7 +278,7 @@ const SurveyPage = () => {
               {formData.mainGame ? (
                 <label className="form-field">
                   <span>
-                    Q5. ({formData.mainGame}) 현재 인게임 랭크는 무엇입니까?{' '}
+                    Q6. ({mainGameLabel}) 현재 인게임 랭크는 무엇입니까?{' '}
                     {rankExamples && <span className="hint-text">{rankExamples}</span>}
                   </span>
                   <input
@@ -215,14 +291,17 @@ const SurveyPage = () => {
                   />
                 </label>
               ) : (
-                <p className="hint-text">Q5. (질문 4에서 주력 게임을 선택하세요)</p>
+                <p className="hint-text">Q6. (질문 4에서 주력 게임을 선택하세요)</p>
               )}
             </fieldset>
 
             <fieldset>
               <legend>경험치와 자기 평가</legend>
               <label className="form-field" htmlFor="playTime">
-                <span>Q6. 총 플레이 시간</span>
+                <span>
+                  Q7. (질문 4에서 선택한) 귀하의 총 플레이 시간은 대략 어느 정도입니까? (Riot/Steam 계정에서
+                  확인 가능)
+                </span>
                 <select id="playTime" name="playTime" value={formData.playTime} onChange={handleGeneralChange}>
                   {playTimeOptions.map(option => (
                     <option key={option} value={option}>
@@ -232,7 +311,7 @@ const SurveyPage = () => {
                 </select>
               </label>
               <label className="form-field" htmlFor="selfAssessment">
-                <span>Q7. 전반적인 FPS 실력 자가 평가 (1: 매우 낮음 - 7: 매우 높음)</span>
+                <span>Q8. 다른 플레이어들과 비교하여, 귀하 스스로의 전반적인 FPS 게임 실력을 어떻게 평가하십니까?</span>
                 <div className="slider-row">
                   <span>(1)</span>
                   <input
