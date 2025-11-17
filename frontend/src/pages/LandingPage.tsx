@@ -1,12 +1,14 @@
 // src/pages/LandingPage.tsx
 import { useNavigate } from 'react-router-dom';
 import './LandingPage.css';
+import DarkVeilBackground from '../components/DarkVeil';
 
 const LandingPage = () => {
   const navigate = useNavigate();
 
   return (
     <div className="landing-page">
+
       {/* Hero Section */}
       <header className="hero">
         <nav className="navbar">

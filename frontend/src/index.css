@@ -1,4 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* src/index.css */
+
+
 * {
   margin: 0;
   padding: 0;
