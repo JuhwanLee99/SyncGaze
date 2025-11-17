@@ -171,7 +171,8 @@
 /* Features Section */
 .features {
   padding: 6rem 4rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.00);
+
 }
 
 .features h2 {
@@ -223,7 +224,7 @@
 .how-it-works {
   padding: 6rem 4rem;
   background: rgba(15, 12, 41, 0.0); /* Semi-transparent dark background */
-  backdrop-filter: blur(10px); /* Adds a nice blur effect */
+ 
 }
 
 .how-it-works h2 {

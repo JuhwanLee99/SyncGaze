@@ -52,25 +52,25 @@ const LandingPage = () => {
         <h2>Why Choose SyncGaze?</h2>
         <div className="feature-grid">
           <div className="feature-card">
-            <div className="feature-icon">👁️</div>
+          
             <h3>Eye Tracking Technology</h3>
             <p>Advanced WebGazer integration for precise gaze tracking and analysis</p>
           </div>
           
           <div className="feature-card">
-            <div className="feature-icon">📊</div>
+          
             <h3>Data-Driven Insights</h3>
             <p>Comprehensive CSV reports with visualizations of your performance metrics</p>
           </div>
           
           <div className="feature-card">
-            <div className="feature-icon">🎯</div>
+      
             <h3>Calibrated Training</h3>
             <p>Personalized calibration ensures accurate tracking tailored to you</p>
           </div>
           
           <div className="feature-card">
-            <div className="feature-icon">⚡</div>
+            
             <h3>Real-Time Feedback</h3>
             <p>60-second training sessions with instant performance tracking</p>
           </div>
