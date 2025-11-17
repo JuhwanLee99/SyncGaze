@@ -1,10 +1,13 @@
 export type GameState =
   | 'idle'
+  | 'webcamCheck'
   | 'calibrating'
   | 'confirmValidation'
   | 'validating'
   | 'task'
   | 'finished';
+
+export type QualitySetting = 'low' | 'medium' | 'high';
 
 export interface DataRecord {
   timestamp: number;

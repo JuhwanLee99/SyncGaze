@@ -1,6 +1,13 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { FORBIDDEN_ZONE, TOTAL_TASKS, RECALIBRATION_THRESHOLD } from '../../features/tracker/calibration/constants';
-import { DataRecord, DotPosition, GameState, LiveGaze, TaskResult } from '../../features/tracker/calibration/types';
+import {
+  DataRecord,
+  DotPosition,
+  GameState,
+  LiveGaze,
+  TaskResult,
+  QualitySetting,
+} from '../../features/tracker/calibration/types';
 
 interface WebgazerContextValue {
   gameState: GameState;
@@ -14,8 +21,12 @@ interface WebgazerContextValue {
   taskResults: TaskResult[];
   isValidationSuccessful: boolean;
   validationSequence: number;
+  quality: QualitySetting;
+  isFaceDetected: boolean;
   startSession: () => void;
+  setQuality: (quality: QualitySetting) => void;
   handleCalibrationComplete: () => void;
+  handleWebcamCheckComplete: () => void;
   startValidation: () => void;
   startTaskPhase: () => void;
   handleRecalibrate: () => void;
@@ -24,6 +35,11 @@ interface WebgazerContextValue {
 }
 
 const USE_KALMAN_FILTER = true;
+const CAMERA_SETTINGS: Record<QualitySetting, { width: number; height: number; frameRate: number }> = {
+  low: { width: 640, height: 480, frameRate: 30 },
+  medium: { width: 1280, height: 720, frameRate: 60 },
+  high: { width: 1920, height: 1080, frameRate: 60 },
+};
 
 const WebgazerContext = createContext<WebgazerContextValue | undefined>(undefined);
 
@@ -39,6 +55,11 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
   const [taskResults, setTaskResults] = useState<TaskResult[]>([]);
   const [isValidationSuccessful, setIsValidationSuccessful] = useState(false);
   const [validationSequence, setValidationSequence] = useState(0);
+  const [quality, setQuality] = useState<QualitySetting>('high');
+  const [isFaceDetected, setIsFaceDetected] = useState(false);
+  const updateQuality = useCallback((nextQuality: QualitySetting) => {
+    setQuality(nextQuality);
+  }, []);
 
   const collectedData = useRef<DataRecord[]>([]);
   const validationGazePoints = useRef<{ x: number; y: number }[]>([]);
@@ -85,6 +106,24 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     window.webgazer.showPredictionPoints(shouldShow);
   }, [gameState, isReady]);
 
+  useEffect(() => {
+    if (gameState !== 'webcamCheck' || !window.webgazer) {
+      return;
+    }
+    setIsFaceDetected(false);
+    const detectionListener = (data: { x: number; y: number } | null) => {
+      if (data?.x != null && data?.y != null) {
+        setIsFaceDetected(true);
+        window.webgazer?.clearGazeListener();
+      }
+    };
+    window.webgazer.clearGazeListener();
+    window.webgazer.setGazeListener(detectionListener);
+    return () => {
+      window.webgazer?.clearGazeListener();
+    };
+  }, [gameState]);
+
   const startSession = useCallback(() => {
     if (!isReady || !window.webgazer) {
       return;
@@ -109,12 +148,31 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     window.webgazer.begin();
     hasWebgazerStarted.current = true;
     window.webgazer.applyKalmanFilter(USE_KALMAN_FILTER);
-    setGameState('calibrating');
+    setIsFaceDetected(false);
+    setGameState('webcamCheck');
   }, [isReady]);
 
   const handleCalibrationComplete = useCallback(() => {
     setGameState('confirmValidation');
   }, []);
+
+  const handleWebcamCheckComplete = useCallback(() => {
+    if (!window.webgazer) {
+      return;
+    }
+    const constraints = CAMERA_SETTINGS[quality];
+    if (typeof window.webgazer.setCameraConstraints === 'function') {
+      window.webgazer.setCameraConstraints({
+        video: {
+          width: constraints.width,
+          height: constraints.height,
+          frameRate: constraints.frameRate,
+        },
+      });
+    }
+    window.webgazer.setRegression('ridge');
+    setGameState('calibrating');
+  }, [quality]);
 
   const startValidation = useCallback(() => {
     setValidationError(null);
@@ -329,8 +387,12 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     taskResults,
     isValidationSuccessful,
     validationSequence,
+    quality,
+    isFaceDetected,
     startSession,
+    setQuality: updateQuality,
     handleCalibrationComplete,
+    handleWebcamCheckComplete,
     startValidation,
     startTaskPhase,
     handleRecalibrate,

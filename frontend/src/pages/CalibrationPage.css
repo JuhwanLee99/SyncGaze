@@ -55,6 +55,15 @@
   text-align: center;
 }
 
+.instructions-container .eyebrow {
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.2rem;
+  color: #9ea7ff;
+  margin-bottom: 0.5rem;
+  display: inline-block;
+}
+
 .instructions-container h1 {
   font-size: 2.5rem;
   margin-bottom: 2rem;
@@ -96,6 +105,27 @@
 .instruction-item p {
   color: #b8b8d1;
   line-height: 1.5;
+}
+
+.environment-callout {
+  margin-top: 1.5rem;
+  text-align: left;
+  background: rgba(12, 20, 54, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+.environment-callout h3 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
+.environment-callout ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: #d9dcff;
+  line-height: 1.6;
 }
 
 /* Calibrating State */

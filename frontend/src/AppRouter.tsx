@@ -8,6 +8,7 @@ import ResultsPage from './pages/ResultsPage';
 import TrackerAppPage from './pages/TrackerAppPage';
 import TrackerFlowPage from './pages/TrackerFlowPage';
 import SurveyPage from './pages/onboarding/SurveyPage';
+import ResearchConsentPage from './pages/onboarding/ResearchConsentPage';
 import { ReactElement } from 'react';
 
 const getIsAuthenticated = () => {
@@ -90,6 +91,14 @@ const AppRouter = () => {
           element={(
             <ProtectedRoute>
               <SurveyPage />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/onboarding/consent"
+          element={(
+            <ProtectedRoute>
+              <ResearchConsentPage />
             </ProtectedRoute>
           )}
         />

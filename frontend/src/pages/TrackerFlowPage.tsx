@@ -25,11 +25,11 @@ const TrackerFlowPage = () => {
       },
       {
         id: 'consent',
-        title: '연구 동의서',
-        description: '참여 동의 확인 및 서명',
+        title: '연구 소개 및 동의',
+        description: '연구 절차 안내 후 참여 동의',
         completed: consentAccepted,
         actionLabel: consentAccepted ? '동의 상태 관리' : '동의하기',
-        navigateTo: '/tracker-app',
+        navigateTo: '/onboarding/consent',
       },
       {
         id: 'calibration',
