@@ -10,7 +10,7 @@ const LandingPage = () => {
       {/* Hero Section */}
       <header className="hero">
         <nav className="navbar">
-          <div className="logo">AimTracker</div>
+          <div className="logo">SyncGaze</div>
           <button className="nav-button" onClick={() => navigate('/auth')}>
             Sign In
           </button>
@@ -36,7 +36,7 @@ const LandingPage = () => {
 
       {/* Features Section */}
       <section id="features" className="features">
-        <h2>Why Choose AimTracker?</h2>
+        <h2>Why Choose SyncGaze?</h2>
         <div className="feature-grid">
           <div className="feature-card">
             <div className="feature-icon">👁️</div>
@@ -105,7 +105,7 @@ const LandingPage = () => {
 
       {/* Footer */}
       <footer className="footer">
-        <p>&copy; 2025 AimTracker. All rights reserved.</p>
+        <p>&copy; 2025 SyncGaze. All rights reserved.</p>
       </footer>
     </div>
   );
