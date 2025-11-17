@@ -239,6 +239,8 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
       } else {
         setIsValidationSuccessful(false);
       }
+      
+      setGameState('validationResult');
     }, 3000);
 
     return () => {

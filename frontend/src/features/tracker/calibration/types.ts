@@ -3,8 +3,8 @@ export type GameState =
   | 'webcamCheck'
   | 'calibrating'
   | 'confirmValidation'
-  | 'validating';
-
+  | 'validating'
+  | 'validationResult';
 export type QualitySetting = 'low' | 'medium' | 'high';
 
 export interface DotPosition {

@@ -45,14 +45,12 @@ const CalibrationPage = () => {
         validationError,
         completedAt: new Date().toISOString(),
       });
-      navigate('/training');
     }
   }, [
     isValidationSuccessful,
     validationSequence,
     validationError,
     saveCalibrationResult,
-    navigate,
   ]);
 
   const renderContent = () => {
@@ -164,6 +162,18 @@ const CalibrationPage = () => {
               validationError={validationError}
               gazeStability={gazeStability}
               onRecalibrate={handleRecalibrate}
+            />
+          </div>
+        );
+        case 'validationResult':
+        return (
+          <div className="calibration-screen">
+            <Validation
+              validationError={validationError}
+              gazeStability={gazeStability}
+              onRecalibrate={handleRecalibrate}
+              canProceed={isValidationSuccessful}
+              onProceed={() => navigate('/training')}
             />
           </div>
         );
