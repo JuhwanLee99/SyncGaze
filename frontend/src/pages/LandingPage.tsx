@@ -8,11 +8,22 @@ const LandingPage = () => {
 
   return (
     <div className="landing-page">
-
+        <div className="dark-veil-container">
+        <DarkVeilBackground 
+          hueShift={0}
+          noiseIntensity={0.02}
+          scanlineIntensity={0.1}
+          speed={0.5}
+          scanlineFrequency={2}
+          warpAmount={0.3}
+          resolutionScale={1}
+        />
+      </div>
+    <div className="landing-content">
       {/* Hero Section */}
       <header className="hero">
         <nav className="navbar">
-          <div className="logo">AimTracker</div>
+          <div className="logo">SyncGaze</div>
           <button className="nav-button" onClick={() => navigate('/auth')}>
             Sign In
           </button>
@@ -38,7 +49,7 @@ const LandingPage = () => {
 
       {/* Features Section */}
       <section id="features" className="features">
-        <h2>Why Choose AimTracker?</h2>
+        <h2>Why Choose SyncGaze?</h2>
         <div className="feature-grid">
           <div className="feature-card">
             <div className="feature-icon">👁️</div>
@@ -107,8 +118,11 @@ const LandingPage = () => {
 
       {/* Footer */}
       <footer className="footer">
-        <p>&copy; 2025 AimTracker. All rights reserved.</p>
+        <p>&copy; 2025 SyncGaze. All rights reserved.</p>
       </footer>
+    </div>
+
+      
     </div>
   );
 };
