@@ -532,19 +532,3 @@
   gap: 1rem;
   margin-top: 1.5rem;
 }
-
-.task-dot {
-  position: absolute;
-  width: 30px;
-  height: 30px;
-  background-color: #28a745;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 0 15px rgba(40, 167, 69, 0.7);
-  transform: translate(-50%, -50%);
-  transition: transform 0.1s ease;
-}
-
-.task-dot:hover {
-  transform: translate(-50%, -50%) scale(1.2);
-}

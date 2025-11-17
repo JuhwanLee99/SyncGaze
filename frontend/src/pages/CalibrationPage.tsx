@@ -5,7 +5,6 @@ import './CalibrationPage.css';
 import { useTrackingSession } from '../state/trackingSessionContext';
 import Calibration from '../features/tracker/calibration/components/Calibration';
 import Validation from '../features/tracker/calibration/components/Validation';
-import Task from '../features/tracker/calibration/components/Task';
 import WebcamCheck from '../features/tracker/calibration/components/WebcamCheck';
 import { useWebgazer } from '../hooks/tracking/useWebgazer';
 import { RECALIBRATION_THRESHOLD } from '../features/tracker/calibration/constants';
@@ -19,8 +18,6 @@ const CalibrationPage = () => {
     liveGaze,
     validationError,
     gazeStability,
-    currentDot,
-    taskCount,
     isValidationSuccessful,
     validationSequence,
     startSession,
@@ -30,9 +27,7 @@ const CalibrationPage = () => {
     isFaceDetected,
     handleWebcamCheckComplete,
     startValidation,
-    startTaskPhase,
     handleRecalibrate,
-    handleTaskDotClick,
     handleCalStage3Complete,
   } = useWebgazer();
   const lastSequenceRef = useRef(validationSequence);
@@ -169,33 +164,7 @@ const CalibrationPage = () => {
               validationError={validationError}
               gazeStability={gazeStability}
               onRecalibrate={handleRecalibrate}
-              onStartTask={startTaskPhase}
             />
-          </div>
-        );
-      case 'task':
-        return (
-          <div className="calibration-screen">
-            <Task taskCount={taskCount} currentDot={currentDot} onDotClick={handleTaskDotClick} />
-          </div>
-        );
-      case 'finished':
-        return (
-          <div className="calibration-screen">
-            <div className="results-container">
-              <h2>Calibration Measurement Complete</h2>
-              <p className="accuracy-message">
-                Great work! We've recorded the final accuracy metrics. You can proceed to training or recalibrate for better results.
-              </p>
-              <div className="button-group">
-                <button className="primary-button" onClick={() => navigate('/training')}>
-                  Go to Training
-                </button>
-                <button className="secondary-button" onClick={handleRecalibrate}>
-                  Recalibrate
-                </button>
-              </div>
-            </div>
           </div>
         );
       default:

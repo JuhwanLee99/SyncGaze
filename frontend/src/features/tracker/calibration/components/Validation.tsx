@@ -4,10 +4,9 @@ interface ValidationProps {
   validationError: number | null;
   gazeStability: number | null;
   onRecalibrate: () => void;
-  onStartTask: () => void;
 }
 
-const Validation = ({ validationError, gazeStability, onRecalibrate, onStartTask }: ValidationProps) => {
+const Validation = ({ validationError, gazeStability, onRecalibrate }: ValidationProps) => {
   const needsRecalibration = validationError !== null && validationError > RECALIBRATION_THRESHOLD;
   return (
     <div className="validation-container">
@@ -26,7 +25,6 @@ const Validation = ({ validationError, gazeStability, onRecalibrate, onStartTask
             </p>
           )}
           <div className="controls">
-            <button onClick={onStartTask}>과제 시작</button>
             <button onClick={onRecalibrate}>재보정</button>
           </div>
         </div>
