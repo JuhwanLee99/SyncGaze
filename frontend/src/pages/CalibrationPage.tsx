@@ -157,7 +157,7 @@ const CalibrationPage = () => {
         );
       case 'validating':
         return (
-          <div className="calibration-screen">
+          <div className="calibration-screen validation-active">
             <Validation
               validationError={validationError}
               gazeStability={gazeStability}
@@ -165,9 +165,9 @@ const CalibrationPage = () => {
             />
           </div>
         );
-        case 'validationResult':
+      case 'validationResult':
         return (
-          <div className="calibration-screen">
+          <div className="calibration-screen validation-active">
             <Validation
               validationError={validationError}
               gazeStability={gazeStability}
