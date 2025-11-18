@@ -4,10 +4,11 @@ interface ValidationProps {
   validationError: number | null;
   gazeStability: number | null;
   onRecalibrate: () => void;
-  onStartTask: () => void;
+  canProceed?: boolean;
+  onProceed?: () => void;
 }
 
-const Validation = ({ validationError, gazeStability, onRecalibrate, onStartTask }: ValidationProps) => {
+const Validation = ({ validationError, gazeStability, onRecalibrate, canProceed, onProceed, }: ValidationProps) => {
   const needsRecalibration = validationError !== null && validationError > RECALIBRATION_THRESHOLD;
   return (
     <div className="validation-container">
@@ -20,14 +21,22 @@ const Validation = ({ validationError, gazeStability, onRecalibrate, onStartTask
           {gazeStability !== null && (
             <p>시선 안정성 (Avg. StdDev): <strong>{gazeStability.toFixed(2)} 픽셀</strong></p>
           )}
-          {needsRecalibration && (
+          {needsRecalibration ? (
             <p style={{ color: 'red', fontWeight: 'bold' }}>
               오차가 크게 측정되었습니다. 정확한 측정을 위해 재보정을 진행해 주세요.
             </p>
-          )}
+            ) : (
+            <p style={{ color: 'green', fontWeight: 'bold' }}>
+              목표 정확도 기준을 충족했습니다. 다음 단계로 이동할 수 있습니다.
+            </p>
+            )}
           <div className="controls">
-            <button onClick={onStartTask}>과제 시작</button>
             <button onClick={onRecalibrate}>재보정</button>
+            {canProceed && (
+              <button className="primary-button" onClick={onProceed}>
+                트레이닝으로 진행
+              </button>
+            )}
           </div>
         </div>
       )}
