@@ -184,7 +184,8 @@ const TrainingPage = () => {
 
   return (
     <div className="training-page">
-      <Scene />
+
+       <Scene skipCalibration={true} />  {/* skipCalibration prop 추가 */}
       {/* Pre-Training Instructions */}
       {!isTraining && !isComplete && (
         <div className="training-overlay">

@@ -5,7 +5,7 @@ import DashboardPage from './pages/DashboardPage';
 import CalibrationPage from './pages/CalibrationPage';
 import TrainingPage from './pages/TrainingPage';
 import ResultsPage from './pages/ResultsPage';
-import TrackerAppPage from './pages/TrackerAppPage';
+
 import TrackerFlowPage from './pages/TrackerFlowPage';
 import SurveyPage from './pages/onboarding/SurveyPage';
 import ResearchConsentPage from './pages/onboarding/ResearchConsentPage';
@@ -102,14 +102,7 @@ const AppRouter = () => {
             </ProtectedRoute>
           )}
         />
-        <Route
-          path="/tracker-app"
-          element={(
-            <ProtectedRoute>
-              <TrackerAppPage />
-            </ProtectedRoute>
-          )}
-        />
+
         <Route
           path="/tracker-flow"
           element={(
