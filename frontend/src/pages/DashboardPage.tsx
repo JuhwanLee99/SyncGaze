@@ -4,16 +4,16 @@ import { useNavigate } from 'react-router-dom';
 import './DashboardPage.css';
 import { useTrackingSession, TrainingSessionSummary } from '../state/trackingSessionContext';
 import { useAuth } from '../state/authContext';
-import { auth, signOut } from '../lib/firebase';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const { recentSessions, setActiveSessionId, calibrationResult } = useTrackingSession();
-  const { user } = useAuth();
+  const { recentSessions, setActiveSessionId, calibrationResult, resetState } = useTrackingSession();
+  const { user, signOut: signOutUser } = useAuth();
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await signOutUser();
+      resetState();
       navigate('/');
     } catch (error) {
       console.error('Failed to log out', error);

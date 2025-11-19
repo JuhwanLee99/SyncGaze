@@ -1,31 +1,48 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { User } from 'firebase/auth';
-import { auth, onAuthStateChanged } from '../lib/firebase';
+import { auth, onAuthStateChanged, signOut as firebaseSignOut } from '../lib/firebase';
 
 interface AuthContextValue {
   user: User | null;
-  initializing: boolean;
+  loading: boolean;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
-  initializing: true,
+  loading: true,
+  signOut: async () => {
+    throw new Error('AuthProvider is not mounted');
+  },
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [initializing, setInitializing] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      setInitializing(false);
+      setLoading(false);
     });
 
     return unsubscribe;
   }, []);
 
-  return <AuthContext.Provider value={{ user, initializing }}>{children}</AuthContext.Provider>;
+  const handleSignOut = useCallback(async () => {
+    await firebaseSignOut(auth);
+  }, []);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      loading,
+      signOut: handleSignOut,
+    }),
+    [handleSignOut, loading, user],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => useContext(AuthContext);

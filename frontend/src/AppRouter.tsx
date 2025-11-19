@@ -12,13 +12,18 @@ import ResearchConsentPage from './pages/onboarding/ResearchConsentPage';
 import { ReactElement } from 'react';
 import { useAuth } from './state/authContext';
 
-const RouteLoader = () => <div className="route-loader">Loading...</div>;
+const RouteLoader = () => (
+  <div className="route-loader" role="status" aria-live="polite">
+    <div className="route-loader__spinner" aria-hidden="true" />
+    <span>Loading...</span>
+  </div>
+);
 
 const ProtectedRoute = ({ children }: { children: ReactElement }) => {
   const location = useLocation();
-  const { user, initializing } = useAuth();
+  const { user, loading } = useAuth();
 
-  if (initializing) {
+  if (loading) {
     return <RouteLoader />;
   }
 
@@ -31,9 +36,9 @@ const ProtectedRoute = ({ children }: { children: ReactElement }) => {
 
 const PublicOnlyRoute = ({ children }: { children: ReactElement }) => {
   const location = useLocation();
-  const { user, initializing } = useAuth();
+  const { user, loading } = useAuth();
 
-  if (initializing) {
+  if (loading) {
     return <RouteLoader />;
   }
 
