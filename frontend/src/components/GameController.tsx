@@ -1,5 +1,5 @@
 // frontend/src/components/GameController.tsx
-// Updated with 60-second timer for training sessions
+// FIXED: Timer no longer resets when isLocked toggles
 
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
@@ -25,6 +25,7 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
   const [targets, setTargets] = useState<Target3D[]>([]);
   const startTimeRef = useRef<number>(0);
   const hasInitialized = useRef<boolean>(false);
+  const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
 
   const { getMouseData, clearMouseData } = useMouseLook(0.002, isLocked);
 
@@ -58,35 +59,41 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
     };
   }, []);
 
+  // Initialize game once when locked first time
   useEffect(() => {
-    if (!isLocked) {
-      hasInitialized.current = false;
-      return;
-    }
+    if (!isLocked || hasInitialized.current) return;
 
-    if (hasInitialized.current) return;
     hasInitialized.current = true;
-
     console.log('🚀 Initializing game - 60 second session');
     startTimeRef.current = performance.now();
     setTargets([spawnTarget(0)]);
 
-    const gameLoop = setInterval(() => {
+    gameLoopRef.current = setInterval(() => {
       const elapsedTime = performance.now() - startTimeRef.current;
 
-      // Changed from 90000 to 60000 (60 seconds)
       if (elapsedTime > 60000) {
         console.log('⏰ 60 seconds completed');
         onPhaseChange('complete');
-        clearInterval(gameLoop);
+        if (gameLoopRef.current) {
+          clearInterval(gameLoopRef.current);
+          gameLoopRef.current = null;
+        }
       }
     }, 1000);
 
+    console.log('✅ Game loop started');
+  }, [isLocked, spawnTarget, onPhaseChange]);
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
       console.log('🛑 Cleaning up game');
-      clearInterval(gameLoop);
+      if (gameLoopRef.current) {
+        clearInterval(gameLoopRef.current);
+        gameLoopRef.current = null;
+      }
     };
-  }, [isLocked, spawnTarget, onPhaseChange]);
+  }, []);
 
   const handleTargetHit = useCallback((targetId: string) => {
     console.log('💥 Target hit:', targetId);

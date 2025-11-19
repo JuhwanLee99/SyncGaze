@@ -1,4 +1,6 @@
-// src/pages/ResultsPage.tsx
+// frontend/src/pages/ResultsPage.tsx
+// UPDATED: Stops WebGazer when mounting results page
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './ResultsPage.css';
@@ -8,6 +10,7 @@ import {
   useTrackingSession,
 } from '../state/trackingSessionContext';
 import { exportSessionData } from '../utils/sessionExport';
+import { useWebgazer } from '../hooks/tracking/useWebgazer';  // NEW: Import useWebgazer
 
 interface Analytics {
   totalTargets: number;
@@ -26,11 +29,21 @@ const ResultsPage = () => {
     consentAccepted,
     calibrationResult,
   } = useTrackingSession();
+  
+  // NEW: Get stopSession from WebGazer context
+  const { stopSession } = useWebgazer();
+  
   const [sessionData, setSessionData] = useState<TrainingSessionSummary | null>(activeSession);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
+
+  // NEW: Stop WebGazer when results page mounts
+  useEffect(() => {
+    console.log('📊 Results page mounted - stopping WebGazer');
+    stopSession();
+  }, [stopSession]);
 
   useEffect(() => {
     if (!activeSession) {
@@ -175,18 +188,22 @@ const ResultsPage = () => {
             </div>
 
             <div className="metric-card">
-              <div className="metric-icon">⚡</div>
+              <div className="metric-icon">✓</div>
               <div className="metric-content">
-                <div className="metric-value">{analytics.avgReactionTime.toFixed(0)}ms</div>
-                <div className="metric-label">Avg Reaction Time</div>
+                <div className="metric-value">
+                  {analytics.targetsHit}/{analytics.totalTargets}
+                </div>
+                <div className="metric-label">Targets Hit</div>
               </div>
             </div>
 
             <div className="metric-card">
-              <div className="metric-icon">✓</div>
+              <div className="metric-icon">⚡</div>
               <div className="metric-content">
-                <div className="metric-value">{analytics.targetsHit}</div>
-                <div className="metric-label">Targets Hit</div>
+                <div className="metric-value">
+                  {analytics.avgReactionTime.toFixed(0)}ms
+                </div>
+                <div className="metric-label">Avg Reaction Time</div>
               </div>
             </div>
 
@@ -194,22 +211,29 @@ const ResultsPage = () => {
               <div className="metric-icon">👁️</div>
               <div className="metric-content">
                 <div className="metric-value">{analytics.gazeAccuracy.toFixed(1)}%</div>
-                <div className="metric-label">Gaze Tracking</div>
+                <div className="metric-label">Gaze Accuracy</div>
+              </div>
+            </div>
+
+            <div className="metric-card">
+              <div className="metric-icon">🖱️</div>
+              <div className="metric-content">
+                <div className="metric-value">{analytics.mouseAccuracy.toFixed(1)}%</div>
+                <div className="metric-label">Mouse Accuracy</div>
               </div>
             </div>
           </div>
         </section>
 
         {/* Visualizations */}
-        <section className="visualizations-section">
-          <h2>Data Visualizations</h2>
-
+        <section className="viz-section">
+          <h2>Session Visualizations</h2>
           <div className="viz-grid">
             {/* Accuracy Over Time */}
             <div className="viz-card">
               <h3>Accuracy Over Time</h3>
               <div className="viz-placeholder">
-                <div className="placeholder-chart">
+                <div className="chart-placeholder">
                   <div className="chart-line" style={{ height: '60%' }}></div>
                   <div className="chart-line" style={{ height: '75%' }}></div>
                   <div className="chart-line" style={{ height: '85%' }}></div>

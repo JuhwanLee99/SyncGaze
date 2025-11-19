@@ -1,5 +1,5 @@
 // frontend/src/components/TrainingScene.tsx
-// Clean training-only component with no calibration logic
+// UPDATED: Now passes collected training data to parent
 
 import { Canvas, useThree } from '@react-three/fiber';
 import { useRef, useEffect, useState, useCallback } from 'react';
@@ -13,19 +13,19 @@ import { CameraController } from './CameraController';
 import { usePointerLock } from '../hooks/usePointerLock';
 import { useAmmoSystem } from '../hooks/useAmmoSystem';
 import { CS2Physics } from '../utils/cs2Physics';
-import { useTrackingData } from '../hooks/useTrackingData';
+import { useTrackingData, TrackingDataRecord } from '../hooks/useTrackingData';
 import { LiveGaze } from '../types/calibration';
 import { useWebgazer } from '../hooks/tracking/useWebgazer';
 
 interface TrainingSceneProps {
-  onComplete?: (score: number, dataCount: number) => void;
+  onComplete?: (score: number, targetsHit: number, rawData: TrackingDataRecord[]) => void;
 }
 
 export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const { isLocked, requestPointerLock, exitPointerLock } = usePointerLock(canvasRef);
   const [score, setScore] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(60); // Add timer state
+  const [timeRemaining, setTimeRemaining] = useState(60);
   const [liveGaze, setLiveGaze] = useState<LiveGaze>({ x: null, y: null });
   
   // Use WebGazer context (only for gaze data, not calibration)
@@ -34,6 +34,7 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
   // Use tracking data hook for data collection
   const {
     recordTargetHit,
+    getData, // NEW: Get the collected data
     exportData,
     clearData,
     dataCount
@@ -53,7 +54,7 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
   // Component refs
   const gameControllerRef = useRef<GameControllerRef | null>(null);
   const weaponAnimRef = useRef<GlockModelRef | null>(null);
-  const timerStartTime = useRef<number>(0); // Store when timer started
+  const timerStartTime = useRef<number>(0);
 
   // Auto-start training on mount
   useEffect(() => {
@@ -61,15 +62,18 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
     setScore(0);
     setTimeRemaining(60);
     requestPointerLock();
-  }, [clearData, requestPointerLock]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   // Timer - calculate based on elapsed time
   useEffect(() => {
     if (!isLocked) return;
 
-    // Record start time when locked
-    timerStartTime.current = Date.now();
-    console.log('⏰ Timer started at:', timerStartTime.current);
+    // Only set start time if not already set
+    if (timerStartTime.current === 0) {
+      timerStartTime.current = Date.now();
+      console.log('⏰ Timer started at:', timerStartTime.current);
+    }
 
     const interval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - timerStartTime.current) / 1000);
@@ -81,7 +85,7 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
       if (remaining <= 0) {
         clearInterval(interval);
       }
-    }, 100); // Update every 100ms for smooth display
+    }, 100);
 
     return () => {
       console.log('🛑 Clearing timer');
@@ -184,11 +188,23 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
   const handlePhaseChange = useCallback((newPhase: 'training' | 'complete') => {
     if (newPhase === 'complete') {
       exitPointerLock();
-      // Don't call exportData() here - let TrainingPage handle it
-      // Instead, just notify parent with score and data
-      onComplete?.(score, dataCount);
+      
+      // Get the collected training data
+      const collectedData = getData();
+      
+      // Count actual target hits from the data
+      const targetsHit = collectedData.filter(d => d.hitRegistered).length;
+      
+      console.log('✅ Training complete:', {
+        score,
+        targetsHit,
+        dataPointsCollected: collectedData.length
+      });
+      
+      // Pass data to parent
+      onComplete?.(score, targetsHit, collectedData);
     }
-  }, [exitPointerLock, onComplete, score, dataCount]);
+  }, [exitPointerLock, onComplete, score, getData]);
 
   // Reload key listener
   useEffect(() => {
@@ -227,16 +243,12 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
       if (!isLocked) return;
 
       const handleShoot = (e: MouseEvent) => {
-        if (e.button !== 0) return; // Only left click
-        if (ammo.current <= 0) return; // No ammo
+        if (e.button !== 0) return;
+        if (ammo.current <= 0) return;
 
-        // Raycast from center of screen (where crosshair is)
         raycasterRef.current.setFromCamera(new THREE.Vector2(0, 0), camera);
-        
-        // Find all intersections
         const intersects = raycasterRef.current.intersectObjects(scene.children, true);
         
-        // Filter for target objects
         const targetHit = intersects.find(intersect => {
           let obj: THREE.Object3D | null = intersect.object;
           while (obj) {
@@ -249,7 +261,6 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
         });
 
         if (targetHit) {
-          // Find the target ID
           let obj: THREE.Object3D | null = targetHit.object;
           let targetId: string | null = null;
           
@@ -281,12 +292,10 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
     return null;
   };
 
-  // Debug: Log timeRemaining on every render
   console.log('🔄 TrainingScene render - timeRemaining:', timeRemaining);
 
   return (
     <div ref={canvasRef} className="w-screen h-screen fixed inset-0">
-      {/* Live Gaze Indicator (Debug) */}
       {liveGaze.x !== null && liveGaze.y !== null && (
         <div
           className="absolute w-4 h-4 bg-red-500 rounded-full pointer-events-none z-40"
@@ -298,14 +307,12 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
         />
       )}
 
-      {/* HUD */}
       <div className="absolute top-4 left-4 text-white z-30">
         <div className="text-2xl font-bold">Score: {score}</div>
         <div className="text-xl">Ammo: {ammo.current} / 20</div>
         <div className="text-sm text-gray-300">Data: {dataCount} points</div>
       </div>
 
-      {/* Timer Display - Center Top */}
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 text-white z-30">
         <div className="bg-black/70 backdrop-blur-sm px-6 py-3 rounded-lg border-2 border-white/20">
           <div className="text-center">
@@ -313,16 +320,13 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
             <div className={`text-4xl font-bold font-mono ${timeRemaining <= 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
               {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
             </div>
-            {/* Debug: Show raw value */}
             <div className="text-xs text-yellow-300 mt-1">Debug: {timeRemaining}s</div>
           </div>
         </div>
       </div>
 
-      {/* Crosshair (outside Canvas) */}
       <Crosshair />
 
-      {/* 3D Canvas */}
       <Canvas>
         <PerspectiveCamera makeDefault position={[0, 1.6, 0]} fov={90} />
         <CameraRotationTracker />

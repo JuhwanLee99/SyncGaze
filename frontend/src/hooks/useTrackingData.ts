@@ -1,5 +1,5 @@
 // frontend/src/hooks/useTrackingData.ts
-// Data collection hook that uses the WebGazer context without initializing WebGazer
+// UPDATED: Added getData() method to retrieve collected data
 
 import { useRef, useEffect, useCallback } from 'react';
 import { useWebgazer } from './tracking/useWebgazer';
@@ -109,6 +109,11 @@ export const useTrackingData = ({ isActive, phase }: UseTrackingDataProps) => {
     });
   }, []);
 
+  // NEW: Get collected data
+  const getData = useCallback((): TrackingDataRecord[] => {
+    return [...collectedData.current]; // Return a copy
+  }, []);
+
   // Export data as CSV
   const exportData = useCallback(() => {
     const metaData = `# Validation Error (pixels): ${validationError !== null ? validationError.toFixed(2) : 'N/A'}\n`;
@@ -159,6 +164,7 @@ export const useTrackingData = ({ isActive, phase }: UseTrackingDataProps) => {
 
   return {
     recordTargetHit,
+    getData, // NEW: Added this
     exportData,
     clearData,
     dataCount: collectedData.current.length,
