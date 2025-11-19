@@ -26,3 +26,13 @@ body {
   width: 100%;
   min-height: 100vh; /* Changed from height to min-height */
 }
+
+.route-loader {
+  width: 100%;
+  min-height: 50vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #222;
+  font-size: 1rem;
+}

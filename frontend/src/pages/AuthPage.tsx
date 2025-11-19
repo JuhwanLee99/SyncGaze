@@ -1,7 +1,15 @@
 // src/pages/AuthPage.tsx
-import { useState } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AuthPage.css';
+import {
+  auth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from '../lib/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
 
 const AuthPage = () => {
   const navigate = useNavigate();
@@ -13,7 +21,16 @@ const AuthPage = () => {
     username: ''
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showResetForm, setShowResetForm] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetFeedback, setResetFeedback] = useState<
+    { type: 'success' | 'error'; message: string } | null
+  >(null);
+
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -21,22 +38,89 @@ const AuthPage = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    
+    setError(null);
+
     if (!isLogin && formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match!');
+      setError('Passwords do not match.');
       return;
     }
 
-    // TODO: Add actual authentication logic here
-    // For now, just navigate to dashboard
-    console.log('Form submitted:', { isLogin, formData });
-    
-    // Simulate successful login/register
-    localStorage.setItem('isAuthenticated', 'true');
-    localStorage.setItem('userEmail', formData.email);
-    navigate('/dashboard');
+    setLoading(true);
+
+    try {
+      if (isLogin) {
+        await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      } else {
+        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+
+        if (formData.username.trim()) {
+          await updateProfile(userCredential.user, {
+            displayName: formData.username.trim(),
+          });
+        }
+      }
+
+      navigate('/dashboard');
+    } catch (authError) {
+      const message = authError instanceof Error ? authError.message : 'Unable to authenticate. Please try again.';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const email = resetEmail.trim();
+
+    if (!email) {
+      setResetFeedback({
+        type: 'error',
+        message: 'Please enter the email associated with your account.',
+      });
+      return;
+    }
+
+    setResetLoading(true);
+    setResetFeedback(null);
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setResetFeedback({
+        type: 'success',
+        message: 'Password reset email sent. Please check your inbox.',
+      });
+      setResetEmail('');
+      setShowResetForm(false);
+    } catch (resetError) {
+      let message = 'Unable to send reset email. Please try again.';
+
+      if (resetError instanceof FirebaseError) {
+        switch (resetError.code) {
+          case 'auth/user-not-found':
+            message = 'No account found with that email address.';
+            break;
+          case 'auth/invalid-email':
+            message = 'Please enter a valid email address.';
+            break;
+          case 'auth/missing-email':
+            message = 'Please enter your email before requesting a reset.';
+            break;
+          default:
+            message = resetError.message || message;
+            break;
+        }
+      }
+
+      setResetFeedback({
+        type: 'error',
+        message,
+      });
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   return (
@@ -141,14 +225,68 @@ const AuthPage = () => {
                     <input type="checkbox" />
                     <span>Remember me</span>
                   </label>
-                  <a href="#" className="forgot-password">Forgot password?</a>
+                  <button
+                    type="button"
+                    className="forgot-password-button"
+                    onClick={() => {
+                      setResetFeedback(null);
+                      setShowResetForm(true);
+                    }}
+                  >
+                    Forgot password?
+                  </button>
                 </div>
               )}
 
-              <button type="submit" className="submit-button">
-                {isLogin ? 'Sign In' : 'Create Account'}
+              {error && <div className="form-error">{error}</div>}
+
+              <button type="submit" className="submit-button" disabled={loading}>
+                {loading ? 'Please wait…' : isLogin ? 'Sign In' : 'Create Account'}
               </button>
             </form>
+
+            {isLogin && (
+              <div className="password-reset-area">
+                {showResetForm && (
+                  <form className="password-reset-form" onSubmit={handlePasswordReset}>
+                    <label htmlFor="resetEmail">Enter your email</label>
+                    <input
+                      type="email"
+                      id="resetEmail"
+                      name="resetEmail"
+                      placeholder="you@example.com"
+                      value={resetEmail}
+                      onChange={(event) => setResetEmail(event.target.value)}
+                      disabled={resetLoading}
+                      required
+                    />
+                    <div className="reset-actions">
+                      <button
+                        type="button"
+                        className="reset-cancel-button"
+                        onClick={() => setShowResetForm(false)}
+                        disabled={resetLoading}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="reset-submit-button"
+                        disabled={resetLoading}
+                      >
+                        {resetLoading ? 'Sending…' : 'Send reset link'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {resetFeedback && (
+                  <p className={`reset-feedback ${resetFeedback.type}`}>
+                    {resetFeedback.message}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="form-switch">
               <p>
