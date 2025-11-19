@@ -300,6 +300,46 @@
   font-size: 0.9rem;
 }
 
+.guest-error {
+  margin-bottom: 1rem;
+}
+
+.guest-access {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.guest-button {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.guest-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.guest-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.guest-copy {
+  margin-top: 0.75rem;
+  color: #b8b8d1;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
 .form-switch {
   text-align: center;
   margin-top: 2rem;

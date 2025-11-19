@@ -52,6 +52,7 @@ interface TrackingSessionState {
   recentSessions: TrainingSessionSummary[];
   lastSession: TrainingSessionSummary | null;
   activeSessionId: string | null;
+  isAnonymousSession: boolean;
 }
 
 export interface TrackingSessionContextValue extends TrackingSessionState {
@@ -62,6 +63,7 @@ export interface TrackingSessionContextValue extends TrackingSessionState {
   setActiveSessionId: (sessionId: string | null) => void;
   clearRecentSessions: () => void;
   activeSession: TrainingSessionSummary | null;
+  setAnonymousSession: (isAnonymous: boolean) => void;
 }
 
 const STORAGE_KEY = 'trackingSessionState';
@@ -118,6 +120,7 @@ const defaultState: TrackingSessionState = {
   recentSessions: defaultSessions,
   lastSession: defaultSessions[0] ?? null,
   activeSessionId: defaultSessions[0]?.id ?? null,
+  isAnonymousSession: false,
 };
 
 export const TrackingSessionContext = createContext<TrackingSessionContextValue | undefined>(undefined);
@@ -135,6 +138,7 @@ export const TrackingSessionProvider = ({ children }: { children: ReactNode }) =
         return {
           ...defaultState,
           ...parsed,
+          isAnonymousSession: parsed.isAnonymousSession ?? false,
         };
       }
       return defaultState;
@@ -200,6 +204,13 @@ export const TrackingSessionProvider = ({ children }: { children: ReactNode }) =
     }));
   };
 
+  const setAnonymousSession = (isAnonymous: boolean) => {
+    setState(prev => ({
+      ...prev,
+      isAnonymousSession: isAnonymous,
+    }));
+  };
+
   const activeSession = useMemo(() => {
     if (!state.activeSessionId) {
       return state.lastSession;
@@ -216,6 +227,7 @@ export const TrackingSessionProvider = ({ children }: { children: ReactNode }) =
     setActiveSessionId,
     clearRecentSessions,
     activeSession,
+    setAnonymousSession,
   }), [state, activeSession]);
 
   return (

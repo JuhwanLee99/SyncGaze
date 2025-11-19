@@ -6,13 +6,16 @@ import {
   auth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInAnonymously,
   updateProfile,
 } from '../lib/firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { FirebaseError } from 'firebase/app';
+import { useTrackingSession } from '../state/trackingSessionContext';
 
 const AuthPage = () => {
   const navigate = useNavigate();
+  const { setAnonymousSession } = useTrackingSession();
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
@@ -23,6 +26,8 @@ const AuthPage = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [anonymousLoading, setAnonymousLoading] = useState(false);
+  const [anonymousError, setAnonymousError] = useState<string | null>(null);
   const [showResetForm, setShowResetForm] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
@@ -62,12 +67,31 @@ const AuthPage = () => {
         }
       }
 
+      setAnonymousSession(false);
       navigate('/dashboard');
     } catch (authError) {
       const message = authError instanceof Error ? authError.message : 'Unable to authenticate. Please try again.';
       setError(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAnonymousSignIn = async () => {
+    setAnonymousError(null);
+    setAnonymousLoading(true);
+    try {
+      await signInAnonymously(auth);
+      setAnonymousSession(true);
+      navigate('/dashboard');
+    } catch (anonError) {
+      const message =
+        anonError instanceof Error
+          ? anonError.message
+          : 'Unable to start anonymous session. Please try again.';
+      setAnonymousError(message);
+    } finally {
+      setAnonymousLoading(false);
     }
   };
 
@@ -238,15 +262,31 @@ const AuthPage = () => {
                 </div>
               )}
 
-              {error && <div className="form-error">{error}</div>}
+            {error && <div className="form-error">{error}</div>}
 
-              <button type="submit" className="submit-button" disabled={loading}>
-                {loading ? 'Please wait…' : isLogin ? 'Sign In' : 'Create Account'}
-              </button>
-            </form>
+            <button type="submit" className="submit-button" disabled={loading}>
+              {loading ? 'Please wait…' : isLogin ? 'Sign In' : 'Create Account'}
+            </button>
+          </form>
 
-            {isLogin && (
-              <div className="password-reset-area">
+          <div className="guest-access" title="Guest mode is limited to supervised data-collection tests">
+            {anonymousError && <div className="form-error guest-error">{anonymousError}</div>}
+            <button
+              type="button"
+              className="guest-button"
+              onClick={handleAnonymousSignIn}
+              disabled={anonymousLoading}
+            >
+              {anonymousLoading ? 'Starting secure guest session…' : 'Continue as Guest for Data Collection'}
+            </button>
+            <p className="guest-copy">
+              Anonymous mode is only for controlled research tests. We temporarily hide account-only actions while we
+              capture calibration and tracking data without saving a profile.
+            </p>
+          </div>
+
+          {isLogin && (
+            <div className="password-reset-area">
                 {showResetForm && (
                   <form className="password-reset-form" onSubmit={handlePasswordReset}>
                     <label htmlFor="resetEmail">Enter your email</label>
