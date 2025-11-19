@@ -144,9 +144,11 @@ const TrainingPage = () => {
     navigate('/results');
   };
 
-  const handleBackToDashboard = () => {
-    navigate('/dashboard');
-  };
+  const handleBackToDashboard = useCallback(() => {
+    setIsTraining(false);
+    setIsComplete(false);
+    navigate('/dashboard', { replace: true });
+  }, [navigate]);
 
   const recordTrainingData = (data: Partial<TrainingDataPoint>) => {
     trainingDataRef.current.push({
