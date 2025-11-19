@@ -1,5 +1,5 @@
-// frontend/src/components/Scene.tsx - CORRECTED VERSION
-// Fixed all TypeScript type errors
+// frontend/src/components/Scene.tsx - FULLY CORRECTED VERSION
+// Fixed: Gun model position/rotation/scale + shooting logic
 
 import { Canvas, useThree } from '@react-three/fiber';
 import { useRef, useEffect, useState, useCallback } from 'react';
@@ -138,14 +138,18 @@ export const Scene: React.FC<SceneProps> = ({
     }
   }, [shoot, ammo.current, reload]);
 
-  const handleTargetHit = useCallback((targetId: string, mouseData: any) => {
-    if (gameControllerRef.current) {
-      const target = { targetId, hitPosition: null };
-      
-      if (phase === 'training') {
+  // FIXED: Separate handleShoot for shooting system (receives hitInfo)
+  const handleShoot = useCallback((hitInfo: { targetId: string | null; hitPosition: THREE.Vector3 | null }) => {
+    if (hitInfo.targetId && gameControllerRef.current) {
+      // Record hit in tracking system
+      if (hitInfo.hitPosition && phase === 'training') {
         recordTargetHit(
-          targetId,
-          { x: 0, y: 0, z: 0 },
+          hitInfo.targetId,
+          {
+            x: hitInfo.hitPosition.x,
+            y: hitInfo.hitPosition.y,
+            z: hitInfo.hitPosition.z
+          },
           {
             x: cameraRotationRef.current.x,
             y: cameraRotationRef.current.y,
@@ -159,7 +163,8 @@ export const Scene: React.FC<SceneProps> = ({
         );
       }
       
-      gameControllerRef.current.handleTargetHit(targetId);
+      // Call GameController's handleTargetHit via ref
+      gameControllerRef.current.handleTargetHit(hitInfo.targetId);
       setScore(prev => prev + 1);
     }
   }, [recordTargetHit, phase, playerPosition]);
@@ -290,7 +295,7 @@ export const Scene: React.FC<SceneProps> = ({
         />
       )}
 
-      {/* FIXED: Only show idle overlay when NOT skipping calibration */}
+      {/* Only show idle overlay when NOT skipping calibration */}
       {(!isLocked || phase === 'complete' || (phase === 'idle' && !skipCalibration)) && 
        phase !== 'calibration' && 
        phase !== 'validation' && 
@@ -416,7 +421,7 @@ export const Scene: React.FC<SceneProps> = ({
             </div>
           </div>
 
-          {/* FIXED: Use ammo.max instead of ammo.reserve */}
+          {/* Ammo counter */}
           <div style={{
             position: 'absolute',
             bottom: 80,
@@ -438,14 +443,13 @@ export const Scene: React.FC<SceneProps> = ({
         </>
       )}
 
-      {/* FIXED: Conditionally render Crosshair without visible prop */}
+      {/* Crosshair - conditionally rendered */}
       {isLocked && phase === 'training' && <Crosshair />}
 
       <Canvas shadows camera={{ position: [0, 1.6, 0], fov: 75 }}>
         <CameraRotationTracker />
         <PerspectiveCamera makeDefault position={[0, 1.6, 0]} fov={75} />
         
-        {/* FIXED: Only pass isActive and onPhysicsUpdate to CameraController */}
         <CameraController
           isActive={isLocked && phase === 'training'}
           onPhysicsUpdate={handlePhysicsUpdate}
@@ -457,29 +461,33 @@ export const Scene: React.FC<SceneProps> = ({
           onReload={handleReload}
         />
 
+        {/* FIXED: Added position, rotation, and scale props back */}
         <GlockModel 
           ref={weaponAnimRef}
+          position={[0.02, -1.56, -0.081]} 
+          rotation={[0, Math.PI, 0]}
+          scale={1}
           velocity={velocity}
           physics={physicsRef.current}
         />
 
         <Environment />
 
-        {/* FIXED: Use correct props for GameController */}
+        {/* FIXED: GameController onTargetHit is empty - it uses the ref instead */}
         {(phase === 'training') && (
           <GameController
             ref={gameControllerRef}
             isLocked={isLocked && phase === 'training'}
-            onTargetHit={handleTargetHit}
+            onTargetHit={() => {}} 
             onPhaseChange={handlePhaseChange}
           />
         )}
 
-        {/* Shooting system wrapper */}
+        {/* Shooting system wrapper - calls handleShoot */}
         <ShootingSystemWrapper 
           isActive={isLocked && phase === 'training'} 
           canShoot={!ammo.isReloading && ammo.current > 0}
-          onShoot={handleTargetHit}
+          onShoot={handleShoot}
           onTriggerPull={handleTriggerPull}
         />
       </Canvas>
@@ -491,10 +499,10 @@ export const Scene: React.FC<SceneProps> = ({
 const ShootingSystemWrapper: React.FC<{ 
   isActive: boolean; 
   canShoot: boolean;
-  onShoot: (targetId: string, mouseData: any) => void;
+  onShoot: (hitInfo: { targetId: string | null; hitPosition: THREE.Vector3 | null }) => void;
   onTriggerPull: () => void;
 }> = ({ isActive, canShoot, onShoot, onTriggerPull }) => {
-  useShootingSystem({ isActive, canShoot, onShoot: onShoot as any, onTriggerPull });
+  useShootingSystem({ isActive, canShoot, onShoot, onTriggerPull });
   return null;
 };
 

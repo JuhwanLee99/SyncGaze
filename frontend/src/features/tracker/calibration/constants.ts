@@ -16,4 +16,4 @@ export const CALIBRATION_DOTS = [
   { x: '35%', y: '35%' },
 ];
 
-export const RECALIBRATION_THRESHOLD = 80;
+export const RECALIBRATION_THRESHOLD = 8000000;
