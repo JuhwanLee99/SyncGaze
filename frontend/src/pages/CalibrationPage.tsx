@@ -53,6 +53,10 @@ const CalibrationPage = () => {
     saveCalibrationResult,
   ]);
 
+  const handleBackToDashboard = () => {
+    navigate('/dashboard', { replace: true });
+  };
+
   const renderContent = () => {
     if (!isReady) {
       return (
@@ -182,7 +186,14 @@ const CalibrationPage = () => {
     }
   };
 
-  return <div className="calibration-page">{renderContent()}</div>;
+  return (
+    <div className="calibration-page">
+      <button className="back-button" type="button" onClick={handleBackToDashboard}>
+        Back to Dashboard
+      </button>
+      {renderContent()}
+    </div>
+  );
 };
 
 export default CalibrationPage;
