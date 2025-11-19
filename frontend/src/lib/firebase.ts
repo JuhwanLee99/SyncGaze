@@ -13,6 +13,8 @@ import {
   updateProfile,
   signOut,
   onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth';
 
 interface FirebaseConfig {
@@ -52,6 +54,10 @@ for (const key of requiredKeys) {
 
 const app: FirebaseApp = initializeApp(firebaseConfig);
 const auth: Auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
+});
 
 let analytics: Analytics | undefined;
 
@@ -76,5 +82,7 @@ export {
   updateProfile,
   signOut,
   onAuthStateChanged,
+  googleProvider,
+  signInWithPopup,
 };
 export const getAnalyticsInstance = (): Analytics | undefined => analytics;

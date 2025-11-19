@@ -8,6 +8,8 @@ import {
   signInWithEmailAndPassword,
   signInAnonymously,
   updateProfile,
+  googleProvider,
+  signInWithPopup,
 } from '../lib/firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { FirebaseError } from 'firebase/app';
@@ -28,6 +30,8 @@ const AuthPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [anonymousLoading, setAnonymousLoading] = useState(false);
   const [anonymousError, setAnonymousError] = useState<string | null>(null);
+  const [socialLoading, setSocialLoading] = useState(false);
+  const [socialError, setSocialError] = useState<string | null>(null);
   const [showResetForm, setShowResetForm] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
@@ -46,6 +50,7 @@ const AuthPage = () => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSocialError(null);
 
     if (!isLogin && formData.password !== formData.confirmPassword) {
       setError('Passwords do not match.');
@@ -92,6 +97,24 @@ const AuthPage = () => {
       setAnonymousError(message);
     } finally {
       setAnonymousLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setSocialError(null);
+    setSocialLoading(true);
+    try {
+      await signInWithPopup(auth, googleProvider);
+      setAnonymousSession(false);
+      navigate('/dashboard');
+    } catch (googleError) {
+      const message =
+        googleError instanceof Error
+          ? googleError.message
+          : 'Unable to sign in with Google right now. Please try again.';
+      setSocialError(message);
+    } finally {
+      setSocialLoading(false);
     }
   };
 
@@ -263,6 +286,23 @@ const AuthPage = () => {
               )}
 
             {error && <div className="form-error">{error}</div>}
+
+            <div className="oauth-divider">
+              <span />
+              <p>or</p>
+              <span />
+            </div>
+
+            {socialError && <div className="form-error social-error">{socialError}</div>}
+
+            <button
+              type="button"
+              className="google-button"
+              onClick={handleGoogleSignIn}
+              disabled={socialLoading}
+            >
+              {socialLoading ? 'Connecting to Google…' : 'Continue with Google'}
+            </button>
 
             <button type="submit" className="submit-button" disabled={loading}>
               {loading ? 'Please wait…' : isLogin ? 'Sign In' : 'Create Account'}
