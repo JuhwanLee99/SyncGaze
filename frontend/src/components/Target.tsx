@@ -11,6 +11,7 @@ interface TargetProps {
 
 export const Target: React.FC<TargetProps> = ({ target, onHit }) => {
   const meshRef = useRef<THREE.Mesh>(null);
+  const glowRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const scaleRef = useRef(1);
 
@@ -19,7 +20,13 @@ export const Target: React.FC<TargetProps> = ({ target, onHit }) => {
     if (meshRef.current) {
       meshRef.current.userData.isTarget = true;
       meshRef.current.userData.targetId = target.id;
-      meshRef.current.name = target.id; // Also set name for easier identification
+      meshRef.current.name = target.id;
+    }
+    // Also mark the glow mesh so raycasting works on it too
+    if (glowRef.current) {
+      glowRef.current.userData.isTarget = true;
+      glowRef.current.userData.targetId = target.id;
+      glowRef.current.name = target.id;
     }
   }, [target.id]);
 
@@ -64,9 +71,11 @@ export const Target: React.FC<TargetProps> = ({ target, onHit }) => {
   return (
     <mesh
       ref={meshRef}
+      name={target.id}  // ✅ Set name directly as prop
       position={target.position}
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
+      userData={{ isTarget: true, targetId: target.id }}  // ✅ Set userData directly
       castShadow
     >
       <sphereGeometry args={[target.radius, 32, 32]} />
@@ -78,8 +87,12 @@ export const Target: React.FC<TargetProps> = ({ target, onHit }) => {
         roughness={0.4}
       />
       
-      {/* Outer glow ring */}
-      <mesh scale={1.3}>
+      {/* Outer glow ring - also needs userData for raycasting */}
+      <mesh 
+        ref={glowRef}
+        scale={1.3}
+        userData={{ isTarget: true, targetId: target.id }}  // ✅ Add userData to glow
+      >
         <sphereGeometry args={[target.radius, 16, 16]} />
         <meshBasicMaterial 
           color={color}

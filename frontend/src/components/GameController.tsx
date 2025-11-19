@@ -15,7 +15,9 @@ interface GameControllerProps {
 
 export interface GameControllerRef {
   handleTargetHit: (targetId: string) => void;
+  getActiveTargetId: () => string | null;  // ✅ ADD THIS
 }
+
 
 export const GameController = forwardRef<GameControllerRef, GameControllerProps>(({ 
   isLocked, 
@@ -25,7 +27,7 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
   const [targets, setTargets] = useState<Target3D[]>([]);
   const startTimeRef = useRef<number>(0);
   const hasInitialized = useRef<boolean>(false);
-  const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
+  const gameLoopRef = useRef<number | null>(null);
 
   const { getMouseData, clearMouseData } = useMouseLook(0.002, isLocked);
 
@@ -110,9 +112,9 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
 
   // Expose handleTargetHit via ref
   useImperativeHandle(ref, () => ({
-    handleTargetHit
-  }), [handleTargetHit]);
-
+    handleTargetHit,
+    getActiveTargetId: () => targets.length > 0 ? targets[0].id : null  // ✅ Return first target
+  }), [handleTargetHit, targets]);
   return (
     <>
       {targets.map(target => (

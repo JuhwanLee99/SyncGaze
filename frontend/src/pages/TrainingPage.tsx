@@ -44,6 +44,8 @@ const TrainingPage = () => {
       mouseY: record.mouseY,
       targetHit: record.hitRegistered,
       targetId: record.targetId,
+      targetX: record.targetX,     // ✅ ADD THIS
+      targetY: record.targetY,     // ✅ ADD THIS
     }));
   };
 

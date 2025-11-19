@@ -1,5 +1,5 @@
 // frontend/src/hooks/useTrackingData.ts
-// UPDATED: Added getData() method to retrieve collected data
+// UPDATED: Added targetX/targetY (screen coords) and proper mouse data capture
 
 import { useRef, useEffect, useCallback } from 'react';
 import { useWebgazer } from './tracking/useWebgazer';
@@ -10,6 +10,8 @@ export interface TrackingDataRecord {
   phase: 'training' | 'calibration' | 'validation';
   targetId: string | null;
   targetPosition: { x: number; y: number; z: number } | null;
+  targetX: number | null;  // 2D screen coordinate X
+  targetY: number | null;  // 2D screen coordinate Y
   gazeX: number | null;
   gazeY: number | null;
   mouseX: number | null;
@@ -22,28 +24,56 @@ export interface TrackingDataRecord {
 interface UseTrackingDataProps {
   isActive: boolean;
   phase: 'idle' | 'calibration' | 'confirmValidation' | 'validation' | 'training' | 'complete';
+  getCurrentActiveTarget?: () => {
+    id: string;
+    position3D: { x: number; y: number; z: number };
+    screenX: number;
+    screenY: number;
+  } | null;
 }
 
-export const useTrackingData = ({ isActive, phase }: UseTrackingDataProps) => {
+export const useTrackingData = ({ isActive, phase, getCurrentActiveTarget }: UseTrackingDataProps) => {
   const { isReady, liveGaze, validationError } = useWebgazer();
   const collectedData = useRef<TrackingDataRecord[]>([]);
 
-  // Data collection during training
+    // Data collection during training
+    // Data collection during training
+   // Data collection during training
   useEffect(() => {
     if (phase !== 'training' || !isActive || !window.webgazer || !isReady) return;
 
-    // Gaze data listener
+    // Throttling variables
+    let lastGazeTime = 0;
+    const GAZE_SAMPLE_INTERVAL = 100; // Sample every 100ms (10 Hz)
+    
+    // In pointer lock mode, mouse is at screen center (where crosshair is)
+    const screenCenterX = window.innerWidth / 2;
+    const screenCenterY = window.innerHeight / 2;
+    
+    // Track latest mouse position (but in pointer lock, this will be center)
+    let currentMouseX: number | null = screenCenterX;
+    let currentMouseY: number | null = screenCenterY;
+
+    // Gaze data listener with throttling - NOW INCLUDES MOUSE DATA
     const gazeListener = (data: any) => {
-      if (data) {
+      const now = performance.now();
+      if (data && (now - lastGazeTime >= GAZE_SAMPLE_INTERVAL)) {
+        lastGazeTime = now;
+        
+        // Get current active target position (passed via ref or callback)
+        const activeTarget = getCurrentActiveTarget?.();
+        
         collectedData.current.push({
-          timestamp: performance.now(),
+          timestamp: now,
           phase: 'training',
-          targetId: null,
-          targetPosition: null,
+          targetId: activeTarget?.id ?? null,
+          targetPosition: activeTarget?.position3D ?? null,
+          targetX: activeTarget?.screenX ?? null,  // ✅ Active target screen position
+          targetY: activeTarget?.screenY ?? null,  // ✅ Active target screen position
           gazeX: data.x,
           gazeY: data.y,
-          mouseX: null,
-          mouseY: null,
+          mouseX: currentMouseX,
+          mouseY: currentMouseY,
           cameraRotation: null,
           playerPosition: null,
           hitRegistered: false,
@@ -53,19 +83,10 @@ export const useTrackingData = ({ isActive, phase }: UseTrackingDataProps) => {
 
     // Mouse movement listener
     const mouseMoveListener = (event: MouseEvent) => {
-      collectedData.current.push({
-        timestamp: performance.now(),
-        phase: 'training',
-        targetId: null,
-        targetPosition: null,
-        gazeX: null,
-        gazeY: null,
-        mouseX: event.clientX,
-        mouseY: event.clientY,
-        cameraRotation: null,
-        playerPosition: null,
-        hitRegistered: false,
-      });
+      if (document.pointerLockElement === null) {
+        currentMouseX = event.clientX;
+        currentMouseY = event.clientY;
+      }
     };
 
     try {
@@ -85,12 +106,15 @@ export const useTrackingData = ({ isActive, phase }: UseTrackingDataProps) => {
       }
       document.removeEventListener('mousemove', mouseMoveListener);
     };
-  }, [phase, isActive, isReady]);
+  }, [phase, isActive, isReady, getCurrentActiveTarget]);
+          
 
-  // Record target hit
+  // Record target hit with 2D screen coordinates and mouse data
   const recordTargetHit = useCallback((
     targetId: string,
     targetPosition: { x: number; y: number; z: number },
+    targetScreenPos: { x: number; y: number },
+    mouseData: { x: number; y: number } | null,
     cameraRotation: { x: number; y: number; z: number },
     playerPosition: { x: number; y: number; z: number }
   ) => {
@@ -99,17 +123,19 @@ export const useTrackingData = ({ isActive, phase }: UseTrackingDataProps) => {
       phase: 'training',
       targetId,
       targetPosition,
+      targetX: targetScreenPos.x,
+      targetY: targetScreenPos.y,
       gazeX: null,
       gazeY: null,
-      mouseX: null,
-      mouseY: null,
+      mouseX: mouseData?.x ?? null,
+      mouseY: mouseData?.y ?? null,
       cameraRotation,
       playerPosition,
       hitRegistered: true,
     });
   }, []);
 
-  // NEW: Get collected data
+  // Get collected data
   const getData = useCallback((): TrackingDataRecord[] => {
     return [...collectedData.current]; // Return a copy
   }, []);
@@ -117,7 +143,7 @@ export const useTrackingData = ({ isActive, phase }: UseTrackingDataProps) => {
   // Export data as CSV
   const exportData = useCallback(() => {
     const metaData = `# Validation Error (pixels): ${validationError !== null ? validationError.toFixed(2) : 'N/A'}\n`;
-    const header = 'timestamp,phase,targetId,targetX,targetY,targetZ,gazeX,gazeY,mouseX,mouseY,cameraRotX,cameraRotY,cameraRotZ,playerX,playerY,playerZ,hitRegistered';
+    const header = 'timestamp,phase,targetId,target3DX,target3DY,target3DZ,targetX,targetY,gazeX,gazeY,mouseX,mouseY,cameraRotX,cameraRotY,cameraRotZ,playerX,playerY,playerZ,hitRegistered';
     
     const rows = collectedData.current.map(d => {
       const targetPos = d.targetPosition;
@@ -131,6 +157,8 @@ export const useTrackingData = ({ isActive, phase }: UseTrackingDataProps) => {
         targetPos?.x ?? '',
         targetPos?.y ?? '',
         targetPos?.z ?? '',
+        d.targetX ?? '',
+        d.targetY ?? '',
         d.gazeX ?? '',
         d.gazeY ?? '',
         d.mouseX ?? '',
@@ -164,7 +192,7 @@ export const useTrackingData = ({ isActive, phase }: UseTrackingDataProps) => {
 
   return {
     recordTargetHit,
-    getData, // NEW: Added this
+    getData,
     exportData,
     clearData,
     dataCount: collectedData.current.length,

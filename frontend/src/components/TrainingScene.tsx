@@ -31,16 +31,49 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
   // Use WebGazer context (only for gaze data, not calibration)
   const { isReady: isWebGazerReady } = useWebgazer();
 
+
+  const updateActiveTargetPosition = useCallback(() => {
+    if (!cameraRef.current || !sceneRef.current) return null;
+    
+    // Assuming you track which target is currently active
+    // You'll need to modify GameController to expose the current active target
+    const activeTargetId = gameControllerRef.current?.getActiveTargetId?.();
+    
+    if (!activeTargetId) return null;
+    
+    let targetFound = false;
+    let target3DPos = new THREE.Vector3();
+    
+    sceneRef.current.traverse((obj) => {
+      if (obj.userData?.targetId === activeTargetId || obj.name === activeTargetId) {
+        obj.getWorldPosition(target3DPos);
+        targetFound = true;
+      }
+    });
+    
+    if (!targetFound) return null;
+    
+    const screenPos = projectToScreen(target3DPos, cameraRef.current);
+    
+    return {
+      id: activeTargetId,
+      position3D: { x: target3DPos.x, y: target3DPos.y, z: target3DPos.z },
+      screenX: screenPos.x,
+      screenY: screenPos.y,
+    };
+  }, []);
+
   // Use tracking data hook for data collection
   const {
     recordTargetHit,
-    getData, // NEW: Get the collected data
+    getData,
     exportData,
     clearData,
     dataCount
   } = useTrackingData({
     isActive: isLocked,
-    phase: 'training'
+    phase: 'training',
+    getCurrentActiveTarget: updateActiveTargetPosition  // ✅ Pass the function
   });
 
   const { ammo, shoot, reload } = useAmmoSystem(20);
@@ -56,6 +89,16 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
   const weaponAnimRef = useRef<GlockModelRef | null>(null);
   const timerStartTime = useRef<number>(0);
 
+  const cameraRef = useRef<THREE.Camera | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+
+  const activeTargetRef = useRef<{
+    id: string;
+    position3D: THREE.Vector3;
+    screenX: number;
+    screenY: number;
+  } | null>(null);
+
   // Auto-start training on mount
   useEffect(() => {
     clearData();
@@ -64,6 +107,10 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
     requestPointerLock();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
+
+
+ 
+
 
   // Timer - calculate based on elapsed time
   useEffect(() => {
@@ -158,6 +205,33 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
     }
   }, [shoot, ammo]);
 
+  const projectToScreen = (
+    worldPos: THREE.Vector3,
+    camera: THREE.Camera
+  ): { x: number; y: number } => {
+    const vector = worldPos.clone();
+    vector.project(camera);
+    
+    const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (-(vector.y * 0.5) + 0.5) * window.innerHeight;
+    
+    return { x, y };
+  };
+  
+
+  const TargetTracker = () => {
+    const { camera, scene } = useThree();
+    
+    useEffect(() => {
+      // Store references for handleTargetHit to access
+      cameraRef.current = camera;
+      sceneRef.current = scene;
+    }, [camera, scene]);
+    
+    return null;
+  };
+  
+
   // Handle reload
   const handleReload = useCallback(() => {
     const isEmpty = ammo.current === 0;
@@ -165,24 +239,56 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
     weaponAnimRef.current?.triggerReload(isEmpty);
   }, [reload, ammo]);
 
-  // Handle target hit
-  const handleTargetHit = useCallback((targetId: string, mouseData: any) => {
-    setScore(prev => prev + 1);
-    
-    const targetPos = { x: 0, y: 0, z: 0 };
-    const camRot = {
-      x: cameraRotationRef.current.x,
-      y: cameraRotationRef.current.y,
-      z: cameraRotationRef.current.z
-    };
-    const playerPos = {
-      x: playerPosition.x,
-      y: playerPosition.y,
-      z: playerPosition.z
-    };
-    
-    recordTargetHit(targetId, targetPos, camRot, playerPos);
-  }, [playerPosition, recordTargetHit]);
+    const handleTargetHit = useCallback((targetId: string, mouseData: any) => {
+      setScore(prev => prev + 1);
+      
+      // Find the actual target in the scene - need to search recursively
+      let target3DPos = new THREE.Vector3(0, 0, 0);
+      let targetFound = false;
+      
+      if (sceneRef.current) {
+        // Search through all objects recursively
+        sceneRef.current.traverse((obj) => {
+          if (obj.userData?.targetId === targetId || obj.name === targetId) {
+            obj.getWorldPosition(target3DPos);
+            targetFound = true;
+            console.log('✅ Found target:', targetId, 'at position:', target3DPos);
+          }
+        });
+        
+        if (!targetFound) {
+          console.warn('⚠️ Could not find target in scene:', targetId);
+        }
+      }
+      
+      // Convert 3D world position to 2D screen coordinates
+      let targetScreenPos = { x: 0, y: 0 };
+      if (cameraRef.current && targetFound) {
+        targetScreenPos = projectToScreen(target3DPos, cameraRef.current);
+        console.log('📍 Target screen position:', targetScreenPos);
+      }
+      
+      const camRot = {
+        x: cameraRotationRef.current.x,
+        y: cameraRotationRef.current.y,
+        z: cameraRotationRef.current.z
+      };
+      const playerPos = {
+        x: playerPosition.x,
+        y: playerPosition.y,
+        z: playerPosition.z
+      };
+      
+      // Pass both 3D and 2D positions, plus mouse data
+      recordTargetHit(
+        targetId, 
+        { x: target3DPos.x, y: target3DPos.y, z: target3DPos.z },
+        targetScreenPos,
+        mouseData,
+        camRot, 
+        playerPos
+      );
+    }, [playerPosition, recordTargetHit]);
 
   // Handle training complete
   const handlePhaseChange = useCallback((newPhase: 'training' | 'complete') => {
@@ -330,6 +436,7 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
       <Canvas>
         <PerspectiveCamera makeDefault position={[0, 1.6, 0]} fov={90} />
         <CameraRotationTracker />
+        <TargetTracker /> 
         <ShootingController />
         
         <CameraController
