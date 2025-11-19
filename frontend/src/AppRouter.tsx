@@ -10,6 +10,7 @@ import TrackerFlowPage from './pages/TrackerFlowPage';
 import SurveyPage from './pages/onboarding/SurveyPage';
 import ResearchConsentPage from './pages/onboarding/ResearchConsentPage';
 import { ReactElement } from 'react';
+import { useTrackingSession } from './state/trackingSessionContext';
 
 const getIsAuthenticated = () => {
   if (typeof window === 'undefined') {
@@ -21,9 +22,17 @@ const getIsAuthenticated = () => {
 const ProtectedRoute = ({ children }: { children: ReactElement }) => {
   const location = useLocation();
   const isAuthenticated = getIsAuthenticated();
+  const { surveyResponses } = useTrackingSession();
 
   if (!isAuthenticated) {
     return <Navigate to="/auth" replace state={{ from: location }} />;
+  }
+
+  const needsSurvey = !surveyResponses;
+  const isSurveyRoute = location.pathname === '/onboarding/survey';
+
+  if (needsSurvey && !isSurveyRoute) {
+    return <Navigate to="/onboarding/survey" replace state={{ from: location }} />;
   }
 
   return children;
