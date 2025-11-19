@@ -1,4 +1,6 @@
-// src/components/GameController.tsx
+// frontend/src/components/GameController.tsx
+// Updated with 60-second timer for training sessions
+
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
 import { Target } from './Target';
@@ -27,8 +29,10 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
   const { getMouseData, clearMouseData } = useMouseLook(0.002, isLocked);
 
   const spawnTarget = useCallback((elapsedTime: number): Target3D => {
-    const phaseType = elapsedTime < 30000 ? 'static' : elapsedTime < 60000 ? 'moving' : 'mixed';
-    const isMoving = phaseType === 'moving' || (phaseType === 'mixed' && Math.random() > 0.5);
+    // First 30 seconds: static targets only
+    // 30-60 seconds: moving targets only
+    const phaseType = elapsedTime < 30000 ? 'static' : 'moving';
+    const isMoving = phaseType === 'moving';
 
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.random() * Math.PI;
@@ -63,14 +67,16 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
     if (hasInitialized.current) return;
     hasInitialized.current = true;
 
-    console.log('🚀 Initializing game');
+    console.log('🚀 Initializing game - 60 second session');
     startTimeRef.current = performance.now();
     setTargets([spawnTarget(0)]);
 
     const gameLoop = setInterval(() => {
       const elapsedTime = performance.now() - startTimeRef.current;
 
-      if (elapsedTime > 90000) {
+      // Changed from 90000 to 60000 (60 seconds)
+      if (elapsedTime > 60000) {
+        console.log('⏰ 60 seconds completed');
         onPhaseChange('complete');
         clearInterval(gameLoop);
       }
@@ -80,7 +86,7 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
       console.log('🛑 Cleaning up game');
       clearInterval(gameLoop);
     };
-  }, [isLocked, spawnTarget]);
+  }, [isLocked, spawnTarget, onPhaseChange]);
 
   const handleTargetHit = useCallback((targetId: string) => {
     console.log('💥 Target hit:', targetId);
@@ -108,3 +114,5 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
     </>
   );
 });
+
+GameController.displayName = 'GameController';

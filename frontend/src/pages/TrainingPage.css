@@ -1,12 +1,13 @@
 /* src/pages/TrainingPage.css */
+/* TrainingPage.css */
 .training-page {
   width: 100%;
+  height: 100vh;        /* Add this line */
   min-height: 100vh;
   position: relative;
   background: #000;
-  overflow: auto;
+  overflow: hidden;     /* Change from 'auto' to 'hidden' */
 }
-
 /* Overlay States */
 .training-overlay {
   position: absolute;

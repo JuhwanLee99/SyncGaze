@@ -344,6 +344,7 @@ export const Scene: React.FC<SceneProps> = ({
           <div className="text-sm text-gray-300">Data: {dataCount} points</div>
         </div>
       )}
+      {phase === 'training' && <Crosshair />}
 
       {/* 3D Canvas */}
       <Canvas>
@@ -377,7 +378,7 @@ export const Scene: React.FC<SceneProps> = ({
 
         <Environment />
         
-        {phase === 'training' && <Crosshair />}
+   
       </Canvas>
     </div>
   );
