@@ -1,7 +1,8 @@
-// frontend/src/components/TrackingIntegration.tsx
-import { useEffect, useRef, useState } from 'react';
-import { useWebgazer } from '../hooks/tracking/useWebgazer';
+// frontend/src/hooks/useTrackingData.ts
+// Data collection hook that uses the WebGazer context without initializing WebGazer
 
+import { useRef, useEffect, useCallback } from 'react';
+import { useWebgazer } from './tracking/useWebgazer';
 
 // Data structure for collected tracking data
 export interface TrackingDataRecord {
@@ -18,109 +19,18 @@ export interface TrackingDataRecord {
   hitRegistered: boolean;
 }
 
-interface UseTrackingSystemProps {
+interface UseTrackingDataProps {
   isActive: boolean;
-  phase: 'idle' | 'calibration' | 'validation' | 'training' | 'complete';
+  phase: 'idle' | 'calibration' | 'confirmValidation' | 'validation' | 'training' | 'complete';
 }
 
-export const useTrackingSystem = ({ isActive, phase }: UseTrackingSystemProps) => {
-  const [isWebGazerReady, setIsWebGazerReady] = useState(false);
-  const [validationError, setValidationError] = useState<number | null>(null);
+export const useTrackingData = ({ isActive, phase }: UseTrackingDataProps) => {
+  const { isReady, liveGaze, validationError } = useWebgazer();
   const collectedData = useRef<TrackingDataRecord[]>([]);
-  const validationGazePoints = useRef<{ x: number; y: number }[]>([]);
-
-  // Load WebGazer script
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = '/webgazer.js';
-    script.async = true;
-    script.onload = () => {
-      if (window.webgazer) {
-        window.webgazer.showPredictionPoints(false); // Hide prediction points during gameplay
-        setIsWebGazerReady(true);
-      }
-    };
-    document.body.appendChild(script);
-
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-      if (window.webgazer) {
-        window.webgazer.end();
-      }
-    };
-  }, []);
-
-  // Start WebGazer when calibration begins
-  useEffect(() => {
-    if (phase === 'calibration' && isWebGazerReady && window.webgazer) {
-      try {
-        window.webgazer.begin();
-      } catch (error) {
-        console.error('Failed to start WebGazer:', error);
-      }
-    }
-  }, [phase, isWebGazerReady]);
-
-  // Validation measurement
-  useEffect(() => {
-    if (phase !== 'validation' || !window.webgazer) return;
-
-    validationGazePoints.current = [];
-    setValidationError(null);
-
-    const validationListener = (data: any) => {
-      if (data) {
-        validationGazePoints.current.push({ x: data.x, y: data.y });
-      }
-    };
-
-    try {
-      window.webgazer.setGazeListener(validationListener);
-    } catch (error) {
-      console.error('Failed to set gaze listener:', error);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      if (!window.webgazer) return;
-      
-      try {
-        window.webgazer.clearGazeListener();
-      } catch (error) {
-        console.error('Failed to clear gaze listener:', error);
-      }
-
-      if (validationGazePoints.current.length === 0) {
-        setValidationError(-1); // Signal for recalibration needed
-        return;
-      }
-
-      // Calculate average gaze position
-      const avgGaze = validationGazePoints.current.reduce(
-        (acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }),
-        { x: 0, y: 0 }
-      );
-      avgGaze.x /= validationGazePoints.current.length;
-      avgGaze.y /= validationGazePoints.current.length;
-
-      // Target is screen center
-      const target = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-
-      // Calculate Euclidean distance error
-      const error = Math.sqrt(
-        Math.pow(target.x - avgGaze.x, 2) + Math.pow(target.y - avgGaze.y, 2)
-      );
-      setValidationError(error);
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [phase]);
 
   // Data collection during training
   useEffect(() => {
-    if (phase !== 'training' || !isActive || !window.webgazer) return;
+    if (phase !== 'training' || !isActive || !window.webgazer || !isReady) return;
 
     // Gaze data listener
     const gazeListener = (data: any) => {
@@ -175,10 +85,10 @@ export const useTrackingSystem = ({ isActive, phase }: UseTrackingSystemProps) =
       }
       document.removeEventListener('mousemove', mouseMoveListener);
     };
-  }, [phase, isActive]);
+  }, [phase, isActive, isReady]);
 
   // Record target hit
-  const recordTargetHit = (
+  const recordTargetHit = useCallback((
     targetId: string,
     targetPosition: { x: number; y: number; z: number },
     cameraRotation: { x: number; y: number; z: number },
@@ -197,10 +107,10 @@ export const useTrackingSystem = ({ isActive, phase }: UseTrackingSystemProps) =
       playerPosition,
       hitRegistered: true,
     });
-  };
+  }, []);
 
   // Export data as CSV
-  const exportData = () => {
+  const exportData = useCallback(() => {
     const metaData = `# Validation Error (pixels): ${validationError !== null ? validationError.toFixed(2) : 'N/A'}\n`;
     const header = 'timestamp,phase,targetId,targetX,targetY,targetZ,gazeX,gazeY,mouseX,mouseY,cameraRotX,cameraRotY,cameraRotZ,playerX,playerY,playerZ,hitRegistered';
     
@@ -240,33 +150,17 @@ export const useTrackingSystem = ({ isActive, phase }: UseTrackingSystemProps) =
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, [validationError]);
 
   // Clear data for new session
-  const clearData = () => {
+  const clearData = useCallback(() => {
     collectedData.current = [];
-    setValidationError(null);
-  };
-
-  // Recalibrate
-  const recalibrate = () => {
-    if (window.webgazer) {
-      try {
-        window.webgazer.clearData();
-      } catch (error) {
-        console.error('Failed to clear WebGazer data:', error);
-      }
-    }
-    clearData();
-  };
+  }, []);
 
   return {
-    isWebGazerReady,
-    validationError,
     recordTargetHit,
     exportData,
     clearData,
-    recalibrate,
     dataCount: collectedData.current.length,
   };
 };
