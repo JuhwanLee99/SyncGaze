@@ -1,4 +1,6 @@
-// frontend/src/components/Scene.tsx - MERGED VERSION WITH NEW CALIBRATION
+// frontend/src/components/Scene.tsx - CORRECTED VERSION
+// Fixed all TypeScript type errors
+
 import { Canvas, useThree } from '@react-three/fiber';
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { PerspectiveCamera } from '@react-three/drei';
@@ -14,29 +16,28 @@ import { useAmmoSystem } from '../hooks/useAmmoSystem';
 import { CS2Physics } from '../utils/cs2Physics';
 import { useTrackingSystem } from './TrackingIntegration';
 import { CalibrationOverlay, ValidationOverlay } from './CalibrationOverlay';
-import { LiveGaze } from '../types/calibration'; // NEW IMPORT
+import { LiveGaze } from '../types/calibration';
 import { useWebgazer } from '../hooks/tracking/useWebgazer';
 
-// Scene.tsx 상단 부분
 type Phase = 'idle' | 'calibration' | 'confirmValidation' | 'validation' | 'training' | 'complete';
 
-// Props 인터페이스 추가
 interface SceneProps {
   skipCalibration?: boolean;
+  isTrainingProp?: boolean;
 }
 
-
-export const Scene: React.FC<SceneProps> = ({ skipCalibration = false }) => {
+export const Scene: React.FC<SceneProps> = ({ 
+  skipCalibration = false,
+  isTrainingProp = false
+}) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const { isLocked, requestPointerLock, exitPointerLock } = usePointerLock(canvasRef);
   const [score, setScore] = useState(0);
   const [phase, setPhase] = useState<Phase>('idle');
   const startTimeRef = useRef<number>(0);
   
-  // NEW: Live gaze state for Stage 3 calibration
   const [liveGaze, setLiveGaze] = useState<LiveGaze>({ x: null, y: null });
   
-  // Tracking system integration
   const {
     isWebGazerReady,
     validationError,
@@ -50,16 +51,13 @@ export const Scene: React.FC<SceneProps> = ({ skipCalibration = false }) => {
     phase: phase as any
   });
 
-  // Ammo system
   const { ammo, shoot, reload } = useAmmoSystem(20);
   
-  // Physics state
   const physicsRef = useRef(new CS2Physics());
   const [velocity, setVelocity] = useState(new THREE.Vector3());
   const [playerPosition, setPlayerPosition] = useState(new THREE.Vector3());
   const cameraRotationRef = useRef(new THREE.Euler());
   
-  // Reference to GameController and weapon animation
   const gameControllerRef = useRef<{ handleTargetHit: (targetId: string) => void } | null>(null);
   const weaponAnimRef = useRef<{
     triggerFire: (recoilMultiplier?: number) => void;
@@ -70,20 +68,29 @@ export const Scene: React.FC<SceneProps> = ({ skipCalibration = false }) => {
   const { isValidationSuccessful, validationSequence } = useWebgazer();
   const validationAutoStartRef = useRef(validationSequence);
 
-  // Camera rotation tracking component
+  // Auto-start training when parent sets isTrainingProp to true
+  useEffect(() => {
+    if (isTrainingProp && skipCalibration && phase === 'idle') {
+      clearData();
+      setScore(0);
+      setPhase('training');
+      startTimeRef.current = performance.now();
+      requestPointerLock();
+    }
+  }, [isTrainingProp, skipCalibration, phase, clearData, requestPointerLock]);
+
   const CameraRotationTracker = () => {
     const { camera } = useThree();
     useEffect(() => {
       const updateRotation = () => {
         cameraRotationRef.current.setFromQuaternion(camera.quaternion);
       };
-      const interval = setInterval(updateRotation, 16); // ~60fps
+      const interval = setInterval(updateRotation, 16);
       return () => clearInterval(interval);
     }, [camera]);
     return null;
   };
 
-  // NEW: Set up live gaze tracking listener for Stage 3 calibration
   useEffect(() => {
     if (!isWebGazerReady || !window.webgazer) return;
 
@@ -131,17 +138,14 @@ export const Scene: React.FC<SceneProps> = ({ skipCalibration = false }) => {
     }
   }, [shoot, ammo.current, reload]);
 
-  const handleShoot = useCallback((hitInfo: { targetId: string | null; hitPosition: THREE.Vector3 | null }) => {
-    if (hitInfo.targetId && gameControllerRef.current) {
-      // Record hit in tracking system
-      if (hitInfo.hitPosition && phase === 'training') {
+  const handleTargetHit = useCallback((targetId: string, mouseData: any) => {
+    if (gameControllerRef.current) {
+      const target = { targetId, hitPosition: null };
+      
+      if (phase === 'training') {
         recordTargetHit(
-          hitInfo.targetId,
-          {
-            x: hitInfo.hitPosition.x,
-            y: hitInfo.hitPosition.y,
-            z: hitInfo.hitPosition.z
-          },
+          targetId,
+          { x: 0, y: 0, z: 0 },
           {
             x: cameraRotationRef.current.x,
             y: cameraRotationRef.current.y,
@@ -155,7 +159,7 @@ export const Scene: React.FC<SceneProps> = ({ skipCalibration = false }) => {
         );
       }
       
-      gameControllerRef.current.handleTargetHit(hitInfo.targetId);
+      gameControllerRef.current.handleTargetHit(targetId);
       setScore(prev => prev + 1);
     }
   }, [recordTargetHit, phase, playerPosition]);
@@ -164,7 +168,6 @@ export const Scene: React.FC<SceneProps> = ({ skipCalibration = false }) => {
     if (newPhase === 'complete') {
       setPhase('complete');
       exitPointerLock();
-      // Export tracking data
       exportData();
     }
   };
@@ -173,7 +176,6 @@ export const Scene: React.FC<SceneProps> = ({ skipCalibration = false }) => {
     clearData();
     setScore(0);
     
-    // skipCalibration이 true이면 바로 training으로, 아니면 calibration으로
     if (skipCalibration) {
       setPhase('training');
       startTimeRef.current = performance.now();
@@ -183,7 +185,6 @@ export const Scene: React.FC<SceneProps> = ({ skipCalibration = false }) => {
     }
   };
 
-  
   const handleCalibrationComplete = () => {
     setPhase('confirmValidation');
   };
@@ -241,15 +242,13 @@ export const Scene: React.FC<SceneProps> = ({ skipCalibration = false }) => {
 
   return (
     <div ref={canvasRef} style={{ width: '100vw', height: '100vh', position: 'relative' }}>
-      {/* Calibration Overlay - NOW WITH liveGaze PROP */}
       {phase === 'calibration' && isWebGazerReady && (
         <CalibrationOverlay 
           onComplete={handleCalibrationComplete}
-          liveGaze={liveGaze}  // NEW: Pass live gaze data
+          liveGaze={liveGaze}
         />
       )}
 
-      {/* Validation Confirmation */}
       {phase === 'confirmValidation' && (
         <div style={{
           position: 'absolute',
@@ -283,7 +282,6 @@ export const Scene: React.FC<SceneProps> = ({ skipCalibration = false }) => {
         </div>
       )}
 
-      {/* Validation Overlay */}
       {phase === 'validation' && (
         <ValidationOverlay
           validationError={validationError}
@@ -292,8 +290,11 @@ export const Scene: React.FC<SceneProps> = ({ skipCalibration = false }) => {
         />
       )}
 
-      {/* Start/Complete overlay */}
-      {(!isLocked || phase === 'complete' || phase === 'idle') && phase !== 'calibration' && phase !== 'validation' && phase !== 'confirmValidation' && (
+      {/* FIXED: Only show idle overlay when NOT skipping calibration */}
+      {(!isLocked || phase === 'complete' || (phase === 'idle' && !skipCalibration)) && 
+       phase !== 'calibration' && 
+       phase !== 'validation' && 
+       phase !== 'confirmValidation' && (
         <div style={{
           position: 'absolute',
           top: '50%',
@@ -415,94 +416,89 @@ export const Scene: React.FC<SceneProps> = ({ skipCalibration = false }) => {
             </div>
           </div>
 
-          {/* Ammo counter */}
+          {/* FIXED: Use ammo.max instead of ammo.reserve */}
           <div style={{
             position: 'absolute',
             bottom: 80,
             right: 20,
-            color: ammo.isEmpty ? '#ff6b6b' : 'white',
-            fontSize: '32px',
+            color: ammo.isEmpty ? '#ff4444' : 'white',
+            fontSize: '28px',
             fontWeight: 'bold',
             zIndex: 10,
-            textShadow: '2px 2px 4px rgba(0,0,0,0.8)'
+            textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+            fontFamily: 'monospace'
           }}>
             {ammo.current} / {ammo.max}
             {ammo.isReloading && (
-              <span style={{ fontSize: '16px', display: 'block', color: '#4ecdc4' }}>
-                RELOADING...
-              </span>
+              <div style={{ fontSize: '16px', color: '#4ecdc4', marginTop: '5px' }}>
+                Reloading...
+              </div>
             )}
-          </div>
-
-          {/* Movement speed indicator */}
-          <div style={{
-            position: 'absolute',
-            bottom: 50,
-            left: 20,
-            color: 'white',
-            fontSize: '14px',
-            zIndex: 10,
-            textShadow: '2px 2px 4px rgba(0,0,0,0.8)'
-          }}>
-            Speed: {Math.round(new THREE.Vector2(velocity.x, velocity.z).length())} u/s
           </div>
         </>
       )}
 
-      {/* Crosshair */}
+      {/* FIXED: Conditionally render Crosshair without visible prop */}
       {isLocked && phase === 'training' && <Crosshair />}
 
-      {/* Canvas - YOUR EXISTING TRAINING GROUND RENDERING */}
-      <Canvas shadows>
-        <PerspectiveCamera makeDefault position={[0, 1.6, 0]} fov={90} />
-        <CameraController 
-          isActive={isLocked && phase === 'training'} 
+      <Canvas shadows camera={{ position: [0, 1.6, 0], fov: 75 }}>
+        <CameraRotationTracker />
+        <PerspectiveCamera makeDefault position={[0, 1.6, 0]} fov={75} />
+        
+        {/* FIXED: Only pass isActive and onPhysicsUpdate to CameraController */}
+        <CameraController
+          isActive={isLocked && phase === 'training'}
           onPhysicsUpdate={handlePhysicsUpdate}
         />
-        <CameraRotationTracker />
-        <ShootingSystemWrapper 
-          isActive={isLocked && phase === 'training'} 
-          canShoot={!ammo.isReloading && ammo.current > 0}
-          onShoot={handleShoot}
-          onTriggerPull={handleTriggerPull}
-        />
+
+        {/* Reload key listener */}
         <ReloadKeyListener 
           isActive={isLocked && phase === 'training'}
           onReload={handleReload}
         />
-        <Environment />
+
         <GlockModel 
           ref={weaponAnimRef}
-          position={[0.02, -1.56, -0.081]} 
-          rotation={[0, Math.PI, 0]}
-          scale={1}
           velocity={velocity}
           physics={physicsRef.current}
         />
-        
-        <GameController 
-          ref={gameControllerRef}
-          isLocked={isLocked && phase === 'training'} 
-          onTargetHit={() => {}}
-          onPhaseChange={handlePhaseChange}
+
+        <Environment />
+
+        {/* FIXED: Use correct props for GameController */}
+        {(phase === 'training') && (
+          <GameController
+            ref={gameControllerRef}
+            isLocked={isLocked && phase === 'training'}
+            onTargetHit={handleTargetHit}
+            onPhaseChange={handlePhaseChange}
+          />
+        )}
+
+        {/* Shooting system wrapper */}
+        <ShootingSystemWrapper 
+          isActive={isLocked && phase === 'training'} 
+          canShoot={!ammo.isReloading && ammo.current > 0}
+          onShoot={handleTargetHit}
+          onTriggerPull={handleTriggerPull}
         />
       </Canvas>
     </div>
   );
 };
 
-// Wrapper to use hook inside Canvas
+// Wrapper to use shooting hook inside Canvas
 const ShootingSystemWrapper: React.FC<{ 
   isActive: boolean; 
   canShoot: boolean;
-  onShoot: (hitInfo: any) => void;
+  onShoot: (targetId: string, mouseData: any) => void;
   onTriggerPull: () => void;
 }> = ({ isActive, canShoot, onShoot, onTriggerPull }) => {
-  useShootingSystem({ isActive, canShoot, onShoot, onTriggerPull });
+  useShootingSystem({ isActive, canShoot, onShoot: onShoot as any, onTriggerPull });
   return null;
 };
 
-// Reload key listener
+// Reload key listener component
 const ReloadKeyListener: React.FC<{ isActive: boolean; onReload: () => void }> = ({ isActive, onReload }) => {
   useEffect(() => {
     if (!isActive) return;

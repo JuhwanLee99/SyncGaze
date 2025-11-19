@@ -1,4 +1,6 @@
-// src/pages/TrainingPage.tsx
+// src/pages/TrainingPage.tsx - UPDATED
+// Key change: Pass isTraining prop to Scene component
+
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Scene } from '../components/Scene';
@@ -186,8 +188,12 @@ const TrainingPage = () => {
 
   return (
     <div className="training-page">
-
-       <Scene skipCalibration={true} />  {/* skipCalibration prop 추가 */}
+      {/* UPDATED: Pass isTraining prop to Scene */}
+      <Scene 
+        skipCalibration={true} 
+        isTrainingProp={isTraining}
+      />
+      
       {/* Pre-Training Instructions */}
       {!isTraining && !isComplete && (
         <div className="training-overlay">
@@ -246,38 +252,19 @@ const TrainingPage = () => {
                 <span className="stat-value">60s</span>
               </div>
               <div className="stat">
-                <span className="stat-label">Data Points</span>
-                <span className="stat-value">{trainingDataRef.current.length}</span>
+                <span className="stat-label">Time Remaining</span>
+                <span className="stat-value">{formatTime(timeRemaining)}</span>
               </div>
             </div>
 
-            <div className="completion-message">
-              <p>✅ Your training data has been saved and converted to CSV</p>
-              <p>View detailed analytics and download your data on the results page</p>
-            </div>
-
-            <div className="training-controls">
+            <div className="action-buttons">
               <button className="view-results-button" onClick={handleViewResults}>
-                View Results & Analytics
+                View Detailed Results
               </button>
-              <button className="back-button-inline" onClick={handleBackToDashboard}>
+              <button className="back-button" onClick={handleBackToDashboard}>
                 Back to Dashboard
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* HUD - Timer and Score */}
-      {isTraining && (
-        <div className="training-hud">
-          <div className="hud-item">
-            <span className="hud-label">Time</span>
-            <span className="hud-value time">{formatTime(timeRemaining)}</span>
-          </div>
-          <div className="hud-item">
-            <span className="hud-label">Score</span>
-            <span className="hud-value score">{score}</span>
           </div>
         </div>
       )}
