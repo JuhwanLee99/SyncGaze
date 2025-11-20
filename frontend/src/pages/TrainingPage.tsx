@@ -8,6 +8,7 @@ import {
   TrainingSessionSummary,
   useTrackingSession,
 } from '../state/trackingSessionContext';
+import { useAuth } from '../state/authContext';
 import { serializeSessionToCsv } from '../utils/sessionExport';
 import { useWebgazer } from '../hooks/tracking/useWebgazer';
 
@@ -20,6 +21,7 @@ const TrainingPage = () => {
     surveyResponses,
     consentAccepted,
   } = useTrackingSession();
+  const { user } = useAuth();
   const [timeRemaining, setTimeRemaining] = useState(60);
   const [isTraining, setIsTraining] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
@@ -129,6 +131,7 @@ const TrainingPage = () => {
       surveyResponses,
       consentAccepted,
       calibrationResult,
+      participantLabel: user?.email ?? user?.displayName ?? user?.uid,
     });
 
     const sessionRecord: TrainingSessionSummary = {
