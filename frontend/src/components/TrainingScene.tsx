@@ -402,17 +402,8 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
 
   return (
     <div ref={canvasRef} className="w-screen h-screen fixed inset-0">
-      {liveGaze.x !== null && liveGaze.y !== null && (
-        <div
-          className="absolute w-4 h-4 bg-red-500 rounded-full pointer-events-none z-40"
-          style={{
-            left: `${liveGaze.x}px`,
-            top: `${liveGaze.y}px`,
-            transform: 'translate(-50%, -50%)',
-          }}
-        />
-      )}
-
+  
+  
       <div className="absolute top-4 left-4 text-white z-30">
         <div className="text-2xl font-bold">Score: {score}</div>
         <div className="text-xl">Ammo: {ammo.current} / 20</div>
