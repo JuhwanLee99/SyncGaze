@@ -287,6 +287,10 @@ const AuthPage = () => {
 
             {error && <div className="form-error">{error}</div>}
 
+            <button type="submit" className="submit-button" disabled={loading}>
+              {loading ? 'Please wait…' : isLogin ? 'Sign In' : 'Create Account'}
+            </button>
+
             <div className="oauth-divider">
               <span />
               <p>or</p>
@@ -302,10 +306,6 @@ const AuthPage = () => {
               disabled={socialLoading}
             >
               {socialLoading ? 'Connecting to Google…' : 'Continue with Google'}
-            </button>
-
-            <button type="submit" className="submit-button" disabled={loading}>
-              {loading ? 'Please wait…' : isLogin ? 'Sign In' : 'Create Account'}
             </button>
           </form>
 
