@@ -104,7 +104,8 @@ const ResultsPage = () => {
 
       try {
         setIsExporting(true);
-        await exportSessionData(
+        const idToken = user ? await user.getIdToken() : undefined;
+        const exportResult = await exportSessionData(
           {
             session: sessionData,
             surveyResponses,
@@ -116,22 +117,32 @@ const ResultsPage = () => {
             filename: `training-session-${sessionData.id}.csv`,
             download: true,
             upload: Boolean(upload),
+            uploadOptions: {
+              sessionId: sessionData.id,
+              idToken,
+            },
           },
         );
-        showToast(
-          upload
-            ? 'CSV downloaded and uploaded successfully.'
-            : 'CSV downloaded successfully.',
-          'success',
-        );
+        const uploadPath = exportResult.uploadResult?.storagePath || exportResult.uploadResult?.downloadUrl;
+        const successMessage = upload
+          ? uploadPath
+            ? `CSV uploaded to Firebase Storage: ${uploadPath}`
+            : 'CSV downloaded and uploaded successfully.'
+          : 'CSV downloaded successfully.';
+
+        showToast(successMessage, 'success');
       } catch (error) {
         console.error('Failed to export session data', error);
-        showToast(upload ? 'CSV upload failed.' : 'CSV export failed.', 'error');
+        const message = error instanceof Error ? error.message : 'Unexpected error occurred.';
+        showToast(
+          upload ? `CSV upload failed: ${message}` : `CSV export failed: ${message}`,
+          'error',
+        );
       } finally {
         setIsExporting(false);
       }
     },
-    [calibrationResult, consentAccepted, participantLabel, sessionData, showToast, surveyResponses],
+    [calibrationResult, consentAccepted, participantLabel, sessionData, showToast, surveyResponses, user],
   );
 
   const handleTrainAgain = () => {
@@ -260,7 +271,7 @@ const ResultsPage = () => {
               onClick={() => handleExport({ upload: true })}
               disabled={isExporting}
             >
-              {isExporting ? 'Uploading…' : 'Upload to /api/upload-csv'}
+              {isExporting ? 'Uploading…' : 'Upload to Firebase Storage'}
             </button>
             <button className="secondary-button" onClick={handleTrainAgain}>
               Train Again
