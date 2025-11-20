@@ -13,7 +13,7 @@ from flask import Flask, jsonify, request
 from google.cloud import bigquery, firestore, storage
 import firebase_admin
 from firebase_admin import credentials
-
+from google.oauth2 import service_account
 
 load_dotenv()
 
@@ -50,9 +50,19 @@ def initialize_firebase() -> firebase_admin.App:
 
 
 firebase_app = initialize_firebase()
-db = firestore.Client()
-storage_client = storage.Client()
-bq_client = bigquery.Client()
+
+# .env에서 JSON 키를 가져와서 Google Cloud 인증 객체 생성
+service_account_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
+gcp_creds = None
+if service_account_json:
+    gcp_creds = service_account.Credentials.from_service_account_info(
+        json.loads(service_account_json)
+    )
+
+# 인증 객체를 전달하여 클라이언트 초기화 (로컬에서는 gcp_creds 사용, 배포 시엔 None이어도 자동 처리됨)
+db = firestore.Client(credentials=gcp_creds)
+storage_client = storage.Client(credentials=gcp_creds)
+bq_client = bigquery.Client(credentials=gcp_creds)
 
 
 SUMMARY_COLLECTION = os.environ.get("FS_SUMMARY_COLLECTION", "sessionSummaries")
