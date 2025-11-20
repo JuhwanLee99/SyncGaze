@@ -8,6 +8,7 @@ import {
   useTrackingSession,
 } from '../state/trackingSessionContext';
 import { exportSessionData } from '../utils/sessionExport';
+import { useAuth } from '../state/authContext';
 
 interface Analytics {
   totalTargets: number;
@@ -26,11 +27,13 @@ const ResultsPage = () => {
     consentAccepted,
     calibrationResult,
   } = useTrackingSession();
+  const { user } = useAuth();
   const [sessionData, setSessionData] = useState<TrainingSessionSummary | null>(activeSession);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
+  const participantLabel = user?.email ?? user?.displayName ?? user?.uid;
 
   useEffect(() => {
     if (!activeSession) {
@@ -107,6 +110,7 @@ const ResultsPage = () => {
             surveyResponses,
             consentAccepted,
             calibrationResult,
+            participantLabel,
           },
           {
             filename: `training-session-${sessionData.id}.csv`,
@@ -127,7 +131,7 @@ const ResultsPage = () => {
         setIsExporting(false);
       }
     },
-    [calibrationResult, consentAccepted, sessionData, showToast, surveyResponses],
+    [calibrationResult, consentAccepted, participantLabel, sessionData, showToast, surveyResponses],
   );
 
   const handleTrainAgain = () => {
