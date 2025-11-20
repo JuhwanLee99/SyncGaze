@@ -188,8 +188,14 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     setGameState('calibrating');
   }, []);
 
+  /*
   const handleCalibrationComplete = useCallback(() => {
     setGameState('validating');
+  }, []);
+  */
+
+  const handleCalibrationComplete = useCallback(() => {
+    setGameState('confirmValidation');  // ✅ Show confirmation first
   }, []);
 
   const handleRecalibrate = useCallback(() => {
@@ -214,9 +220,15 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     setGameState('validating');
   }, []);
 
+  
   // Live gaze tracking
   useEffect(() => {
-    if (!isReady || !window.webgazer || gameState !== 'validating') {
+    if (!isReady || !window.webgazer) {
+      return;
+    }
+    
+    // Update liveGaze during both calibration (Stage 3) AND validation
+    if (gameState !== 'validating' && gameState !== 'calibrating') {
       return;
     }
 
