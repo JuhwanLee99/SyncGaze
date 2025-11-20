@@ -309,21 +309,23 @@ const AuthPage = () => {
             </button>
           </form>
 
-          <div className="guest-access" title="Guest mode is limited to supervised data-collection tests">
-            {anonymousError && <div className="form-error guest-error">{anonymousError}</div>}
-            <button
-              type="button"
-              className="guest-button"
-              onClick={handleAnonymousSignIn}
-              disabled={anonymousLoading}
-            >
-              {anonymousLoading ? 'Starting secure guest session…' : 'Continue as Guest for Data Collection'}
-            </button>
-            <p className="guest-copy">
-              Anonymous mode is only for controlled research tests. We temporarily hide account-only actions while we
-              capture calibration and tracking data without saving a profile.
-            </p>
-          </div>
+          {isLogin && (
+            <div className="guest-access" title="Guest mode is limited to supervised data-collection tests">
+              {anonymousError && <div className="form-error guest-error">{anonymousError}</div>}
+              <button
+                type="button"
+                className="guest-button"
+                onClick={handleAnonymousSignIn}
+                disabled={anonymousLoading}
+              >
+                {anonymousLoading ? 'Starting secure guest session…' : 'Continue as Guest for Data Collection'}
+              </button>
+              <p className="guest-copy">
+                Anonymous mode is only for controlled research tests. We temporarily hide account-only actions while we
+                capture calibration and tracking data without saving a profile.
+              </p>
+            </div>
+          )}
 
           {isLogin && (
             <div className="password-reset-area">
