@@ -4,6 +4,7 @@ import {
   isSupported as isAnalyticsSupported,
   type Analytics,
 } from 'firebase/analytics';
+import { getFirestore, type Firestore } from 'firebase/firestore';
 import {
   getAuth,
   type Auth,
@@ -54,6 +55,7 @@ for (const key of requiredKeys) {
 
 const app: FirebaseApp = initializeApp(firebaseConfig);
 const auth: Auth = getAuth(app);
+const db: Firestore = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: 'select_account',
@@ -76,6 +78,7 @@ if (typeof window !== 'undefined') {
 export {
   app,
   auth,
+  db,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInAnonymously,
