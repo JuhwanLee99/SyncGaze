@@ -153,9 +153,11 @@ const TrainingPage = () => {
     });
   };
 
-  const handleBackToDashboard = () => {
-    navigate('/dashboard');
-  };
+  const handleBackToDashboard = useCallback(() => {
+    setIsTraining(false);
+    setIsComplete(false);
+    navigate('/dashboard', { replace: true });
+  }, [navigate]);
 
   const recordTrainingData = (data: Partial<TrainingDataPoint>) => {
     trainingDataRef.current.push({
@@ -193,7 +195,8 @@ const TrainingPage = () => {
 
   return (
     <div className="training-page">
-      <Scene />
+
+       <Scene skipCalibration={true} />  {/* skipCalibration prop 추가 */}
       {/* Pre-Training Instructions */}
       {!isTraining && !isComplete && (
         <div className="training-overlay">

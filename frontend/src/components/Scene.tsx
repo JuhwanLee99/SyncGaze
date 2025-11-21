@@ -17,9 +17,16 @@ import { CalibrationOverlay, ValidationOverlay } from './CalibrationOverlay';
 import { LiveGaze } from '../types/calibration'; // NEW IMPORT
 import { useWebgazer } from '../hooks/tracking/useWebgazer';
 
+// Scene.tsx 상단 부분
 type Phase = 'idle' | 'calibration' | 'confirmValidation' | 'validation' | 'training' | 'complete';
 
-export const Scene: React.FC = () => {
+// Props 인터페이스 추가
+interface SceneProps {
+  skipCalibration?: boolean;
+}
+
+
+export const Scene: React.FC<SceneProps> = ({ skipCalibration = false }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const { isLocked, requestPointerLock, exitPointerLock } = usePointerLock(canvasRef);
   const [score, setScore] = useState(0);
@@ -165,9 +172,18 @@ export const Scene: React.FC = () => {
   const handleStart = () => {
     clearData();
     setScore(0);
-    setPhase('calibration');
+    
+    // skipCalibration이 true이면 바로 training으로, 아니면 calibration으로
+    if (skipCalibration) {
+      setPhase('training');
+      startTimeRef.current = performance.now();
+      requestPointerLock();
+    } else {
+      setPhase('calibration');
+    }
   };
 
+  
   const handleCalibrationComplete = () => {
     setPhase('confirmValidation');
   };

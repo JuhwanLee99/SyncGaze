@@ -29,7 +29,9 @@ const StageInstruction = ({ stage, onStart }: StageInstructionProps) => {
       <h2>캘리브레이션 ({stage - 1}/2)</h2>
       <h3>{title}</h3>
       <p>{description}</p>
-      <button onClick={onStart}>시작하기</button>
+      <button className="primary-button" onClick={onStart}>
+        시작하기
+      </button>
     </div>
   );
 };

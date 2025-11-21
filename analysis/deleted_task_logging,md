@@ -1,0 +1,10 @@
+# Removed task-phase logging hooks
+
+During the removal of the post-validation task step (commit `9db8bde`), several pieces of logic that captured user interactions were deleted. They can be reused for training-ground analytics:
+
+- **Data structures**: `DataRecord` stored timestamped gaze (`gazeX`, `gazeY`), mouse (`mouseX`, `mouseY`), and target coordinates for each task sample. `TaskResult` captured per-dot aggregates such as time-to-click and distances from gaze to target/click.
+- **Recording loop**: While the game state was `task`, a gaze listener pushed `DataRecord` entries with the current target dot position and gaze coordinates, and a `mousemove` listener appended matching mouse positions.
+- **Click handling**: `handleTaskDotClick` recorded the click location, compared it against the last gaze sample and the current target to compute distances, and advanced the task counter.
+- **CSV export**: No CSV writer existed; collected interaction data lived in memory (`collectedData` ref) and would need explicit export logic to persist it.
+
+Reintroducing these handlers into the training ground would restore granular logging of gaze, mouse, and click interactions for CSV generation.

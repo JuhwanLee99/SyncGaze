@@ -155,39 +155,44 @@ const DashboardPage = () => {
             </div>
           ) : (
             <div className="sessions-table">
-              <div className="table-header">
-                <div className="table-cell">Date</div>
-                <div className="table-cell">Duration</div>
-                <div className="table-cell">Accuracy</div>
-                <div className="table-cell">Targets Hit</div>
-                <div className="table-cell">Avg Reaction</div>
-                <div className="table-cell">Actions</div>
-              </div>
-
-              {recentSessions.map((session: TrainingSessionSummary) => (
-                <div key={session.id} className="table-row">
-                  <div className="table-cell">
-                    {new Date(session.date).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </div>
-                  <div className="table-cell">{session.duration}s</div>
-                  <div className="table-cell">
-                    <span className="accuracy-badge">{session.accuracy.toFixed(1)}%</span>
-                  </div>
-                  <div className="table-cell">
-                    {session.targetsHit}/{session.totalTargets}
-                  </div>
-                  <div className="table-cell">{session.avgReactionTime}ms</div>
-                  <div className="table-cell">
-                    <button className="view-button" onClick={() => handleViewResults(session.id)}>
-                      View Details
-                    </button>
-                  </div>
-                </div>
-              ))}
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">Duration</th>
+                    <th scope="col">Accuracy</th>
+                    <th scope="col">Targets Hit</th>
+                    <th scope="col">Avg Reaction</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentSessions.map((session: TrainingSessionSummary) => (
+                    <tr key={session.id}>
+                      <td>
+                        {new Date(session.date).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </td>
+                      <td>{session.duration}s</td>
+                      <td>
+                        <span className="accuracy-badge">{session.accuracy.toFixed(1)}%</span>
+                      </td>
+                      <td>
+                        {session.targetsHit}/{session.totalTargets}
+                      </td>
+                      <td>{session.avgReactionTime}ms</td>
+                      <td className="table-actions">
+                        <button className="view-button" onClick={() => handleViewResults(session.id)}>
+                          View Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>

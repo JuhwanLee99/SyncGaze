@@ -29,3 +29,10 @@ frontend/process.env
 *.njsproj
 *.sln
 *.sw?
+
+package-lock.json
+<<<<<<< HEAD
+package.json
+=======
+frontend/package-lock.json
+>>>>>>> origin/feat/frontend_calibration
