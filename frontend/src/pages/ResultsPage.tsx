@@ -42,6 +42,8 @@ type AccuracySeriesConfig = {
   tooltipLabel: string;
 };
 
+type HeatmapPoint = { x: number; y: number };
+
 const generateCumulativeSeries = (
   data: TrainingDataPoint[],
   duration: number,
@@ -288,6 +290,8 @@ const ResultsPage = () => {
   const [autoUploadStatus, setAutoUploadStatus] = useState<AutoUploadStatus>('idle');
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
+  const heatmapCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const heatmapContainerRef = useRef<HTMLDivElement | null>(null);
   const participantLabel = user?.email ?? user?.displayName ?? user?.uid;
   const locationState = (location.state as { fromTrainingComplete?: boolean; sessionId?: string } | null) ?? null;
 
@@ -360,6 +364,116 @@ const ResultsPage = () => {
     ],
     [accuracySeries, gazeAccuracySeries, mouseAccuracySeries],
   );
+
+  const { heatmapPoints, baseScreenWidth, baseScreenHeight } = useMemo(() => {
+    if (!sessionData) {
+      return { heatmapPoints: [] as HeatmapPoint[], baseScreenWidth: 1920, baseScreenHeight: 1080 };
+    }
+
+    const validGazePoints = sessionData.rawData.filter(
+      point => point.gazeX !== null && point.gazeY !== null,
+    );
+
+    const maxGazeX = validGazePoints.reduce((max, point) => Math.max(max, point.gazeX ?? 0), 0);
+    const maxGazeY = validGazePoints.reduce((max, point) => Math.max(max, point.gazeY ?? 0), 0);
+
+    const baseScreenWidth = sessionData.screenSize?.width || (maxGazeX || 1920);
+    const baseScreenHeight = sessionData.screenSize?.height || (maxGazeY || 1080);
+
+    const heatmapPoints = validGazePoints
+      .map(point => ({
+        x: (point.gazeX ?? 0) / baseScreenWidth,
+        y: (point.gazeY ?? 0) / baseScreenHeight,
+      }))
+      // Keep only points that fall inside the normalized viewport so the
+      // heatmap doesn't blur everything into the background.
+      .filter(point => point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1);
+
+    return { heatmapPoints, baseScreenWidth, baseScreenHeight };
+  }, [sessionData]);
+
+  const drawHeatmap = useCallback(() => {
+    const canvas = heatmapCanvasRef.current;
+    const container = heatmapContainerRef.current;
+
+    if (!canvas || !container) {
+      return;
+    }
+
+    const rect = container.getBoundingClientRect();
+    const displayWidth = Math.max(1, Math.round(rect.width));
+    const displayHeight = Math.max(1, Math.round(rect.height));
+
+    if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+      canvas.width = displayWidth;
+      canvas.height = displayHeight;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return;
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!heatmapPoints.length) {
+      return;
+    }
+
+    // Build a simple density grid so hotter areas pop visually.
+    const gridSize = 64;
+    const grid = new Float32Array(gridSize * gridSize);
+    let maxCount = 0;
+
+    heatmapPoints.forEach(point => {
+      const gx = Math.min(gridSize - 1, Math.max(0, Math.floor(point.x * gridSize)));
+      const gy = Math.min(gridSize - 1, Math.max(0, Math.floor(point.y * gridSize)));
+      const idx = gy * gridSize + gx;
+      grid[idx] += 1;
+      if (grid[idx] > maxCount) {
+        maxCount = grid[idx];
+      }
+    });
+
+    if (!maxCount) {
+      return;
+    }
+
+    const cellWidth = displayWidth / gridSize;
+    const cellHeight = displayHeight / gridSize;
+
+    const colorForIntensity = (value: number) => {
+      const clamped = Math.min(1, Math.max(0, value));
+      const lightness = 35 + clamped * 15; // deep red at low intensity, brighter red as it increases
+      const alpha = 0.22 + clamped * 0.68;
+      return `hsla(0, 90%, ${lightness}%, ${alpha})`;
+    };
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.filter = 'blur(12px) saturate(120%)';
+    ctx.imageSmoothingEnabled = true;
+
+    for (let y = 0; y < gridSize; y += 1) {
+      for (let x = 0; x < gridSize; x += 1) {
+        const count = grid[y * gridSize + x];
+        if (count === 0) continue;
+        const intensity = count / maxCount;
+        ctx.fillStyle = colorForIntensity(intensity);
+        ctx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
+      }
+    }
+
+    ctx.restore();
+  }, [heatmapPoints]);
+
+  useEffect(() => {
+    const handleResize = () => drawHeatmap();
+    window.addEventListener('resize', handleResize);
+    handleResize();
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, [drawHeatmap, baseScreenWidth, baseScreenHeight]);
 
   // NEW: Stop WebGazer when results page mounts
   useEffect(() => {
@@ -649,16 +763,34 @@ const ResultsPage = () => {
             {/* Gaze Heatmap */}
             <div className="viz-card">
               <h3>Gaze Heatmap</h3>
-              <div className="viz-placeholder">
-                <div className="heatmap-placeholder">
-                  <div className="heatmap-dot" style={{ top: '30%', left: '40%' }}></div>
-                  <div className="heatmap-dot" style={{ top: '50%', left: '50%' }}></div>
-                  <div className="heatmap-dot" style={{ top: '60%', left: '30%' }}></div>
-                  <div className="heatmap-dot" style={{ top: '40%', left: '70%' }}></div>
+              <div className="heatmap-wrapper">
+                {heatmapPoints.length ? (
+                  <div
+                    className="heatmap-container"
+                    ref={heatmapContainerRef}
+                    style={{ aspectRatio: `${baseScreenWidth} / ${baseScreenHeight}` }}
+                  >
+                    <canvas ref={heatmapCanvasRef} className="heatmap-canvas" aria-label="Gaze heatmap" />
+                    <div className="heatmap-overlay" aria-hidden="true">
+                      <div className="heatmap-grid"></div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="chart-empty">No gaze samples collected for this session.</div>
+                )}
+                <div className="heatmap-footer">
+                  <p className="viz-description">
+                    Visualize where your gaze was focused during the session
+                  </p>
+                  {heatmapPoints.length > 0 && (
+                    <div className="heatmap-meta">
+                      <span>{heatmapPoints.length} gaze samples</span>
+                      <span>
+                        Rendered at {Math.round(baseScreenWidth)} × {Math.round(baseScreenHeight)}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <p className="viz-description">
-                  Visualize where your gaze was focused during the session
-                </p>
               </div>
             </div>
           </div>
