@@ -125,7 +125,7 @@ const TrainingPage = () => {
       screenSize: {
         width: window.innerWidth,
         height: window.innerHeight
-      }
+      },
       participantLabel: user?.email ?? user?.displayName ?? user?.uid,
     });
 
