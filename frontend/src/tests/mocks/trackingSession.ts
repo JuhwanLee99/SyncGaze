@@ -17,6 +17,7 @@ export const createTrackingSessionValue = (
   recentSessions: [],
   lastSession: null,
   activeSessionId: null,
+  isAnonymousSession: false,
   setSurveyResponses: vi.fn(),
   setConsentAccepted: vi.fn(),
   saveCalibrationResult: vi.fn(),
@@ -24,6 +25,7 @@ export const createTrackingSessionValue = (
   setActiveSessionId: vi.fn(),
   clearRecentSessions: vi.fn(),
   activeSession: null,
+  setAnonymousSession: vi.fn(),
   ...overrides,
 });
 

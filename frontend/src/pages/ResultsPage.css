@@ -324,6 +324,26 @@
   align-items: center;
 }
 
+.upload-status {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.upload-status.success {
+  color: #4ecdc4;
+}
+
+.upload-status.error {
+  color: #ff8a8a;
+}
+
+.upload-status-inline {
+  padding: 0.9rem 1.5rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(78, 205, 196, 0.4);
+}
+
 .upload-button {
   padding: 1rem 2rem;
   border-radius: 12px;

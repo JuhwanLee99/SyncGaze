@@ -11,6 +11,7 @@ import {
   TrainingSessionSummary,
   useTrackingSession,
 } from '../state/trackingSessionContext';
+import { useAuth } from '../state/authContext';
 import { serializeSessionToCsv } from '../utils/sessionExport';
 
 const TrainingPage = () => {
@@ -21,8 +22,11 @@ const TrainingPage = () => {
     calibrationResult,
     surveyResponses,
     consentAccepted,
+    activeSessionId,
   } = useTrackingSession();
   
+  const { user } = useAuth();
+  const [timeRemaining, setTimeRemaining] = useState(60);
   const [isTraining, setIsTraining] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
@@ -122,6 +126,7 @@ const TrainingPage = () => {
         width: window.innerWidth,
         height: window.innerHeight
       }
+      participantLabel: user?.email ?? user?.displayName ?? user?.uid,
     });
 
     // Update session record with CSV
@@ -144,7 +149,12 @@ const TrainingPage = () => {
   }, [addSession, setActiveSessionId, calibrationResult, surveyResponses, consentAccepted]);
 
   const handleViewResults = () => {
-    navigate('/results');
+    navigate('/results', {
+      state: {
+        fromTrainingComplete: true,
+        sessionId: activeSessionId ?? null,
+      },
+    });
   };
 
   const handleBackToDashboard = () => {

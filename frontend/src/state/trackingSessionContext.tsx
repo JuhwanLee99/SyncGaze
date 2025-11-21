@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export interface SurveyResponses {
   ageCheck: boolean;
@@ -53,6 +55,7 @@ interface TrackingSessionState {
   recentSessions: TrainingSessionSummary[];
   lastSession: TrainingSessionSummary | null;
   activeSessionId: string | null;
+  isAnonymousSession: boolean;
 }
 
 export interface TrackingSessionContextValue extends TrackingSessionState {
@@ -63,6 +66,14 @@ export interface TrackingSessionContextValue extends TrackingSessionState {
   setActiveSessionId: (sessionId: string | null) => void;
   clearRecentSessions: () => void;
   activeSession: TrainingSessionSummary | null;
+  setAnonymousSession: (isAnonymous: boolean) => void;
+  resetState: () => void;
+}
+
+export interface SaveSurveyAndConsentPayload {
+  uid: string;
+  surveyResponses?: SurveyResponses;
+  consentTimestamp?: string;
 }
 
 const STORAGE_KEY = 'trackingSessionState';
@@ -112,13 +123,59 @@ const defaultSessions: TrainingSessionSummary[] = [
   },
 ];
 
-const defaultState: TrackingSessionState = {
-  surveyResponses: null,
-  consentAccepted: false,
-  calibrationResult: null,
-  recentSessions: defaultSessions,
-  lastSession: defaultSessions[0] ?? null,
-  activeSessionId: defaultSessions[0]?.id ?? null,
+const createDefaultState = (): TrackingSessionState => {
+  const sessions = defaultSessions.map(session => ({
+    ...session,
+    rawData: [...session.rawData],
+  }));
+
+  return {
+    surveyResponses: null,
+    consentAccepted: false,
+    calibrationResult: null,
+    recentSessions: sessions,
+    lastSession: sessions[0] ?? null,
+    activeSessionId: sessions[0]?.id ?? null,
+    isAnonymousSession: false,
+  };
+};
+
+export const saveSurveyAndConsent = async ({
+  uid,
+  surveyResponses,
+  consentTimestamp,
+}: SaveSurveyAndConsentPayload) => {
+  const writes: Promise<unknown>[] = [];
+
+  if (surveyResponses) {
+    const surveysCollection = collection(db, 'users', uid, 'surveys');
+    writes.push(
+      addDoc(surveysCollection, {
+        ...surveyResponses,
+        createdAt: serverTimestamp(),
+      }),
+    );
+  }
+
+  if (consentTimestamp) {
+    const consentDoc = doc(db, 'users', uid, 'consent', 'latest');
+    writes.push(
+      setDoc(
+        consentDoc,
+        {
+          consentTimestamp,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      ),
+    );
+  }
+
+  if (writes.length === 0) {
+    return;
+  }
+
+  await Promise.all(writes);
 };
 
 export const TrackingSessionContext = createContext<TrackingSessionContextValue | undefined>(undefined);
@@ -126,7 +183,7 @@ export const TrackingSessionContext = createContext<TrackingSessionContextValue 
 export const TrackingSessionProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<TrackingSessionState>(() => {
     if (typeof window === 'undefined') {
-      return defaultState;
+      return createDefaultState();
     }
 
     try {
@@ -134,14 +191,15 @@ export const TrackingSessionProvider = ({ children }: { children: ReactNode }) =
       if (stored) {
         const parsed = JSON.parse(stored) as TrackingSessionState;
         return {
-          ...defaultState,
+          ...createDefaultState(),
           ...parsed,
+          isAnonymousSession: parsed.isAnonymousSession ?? false,
         };
       }
-      return defaultState;
+      return createDefaultState();
     } catch (error) {
       console.warn('Failed to parse tracking session state:', error);
-      return defaultState;
+      return createDefaultState();
     }
   });
 
@@ -201,6 +259,20 @@ export const TrackingSessionProvider = ({ children }: { children: ReactNode }) =
     }));
   };
 
+  const setAnonymousSession = (isAnonymous: boolean) => {
+    setState(prev => ({
+      ...prev,
+      isAnonymousSession: isAnonymous,
+    }));
+  };
+
+  const resetState = () => {
+    setState(createDefaultState());
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(STORAGE_KEY);
+    }
+  };
+
   const activeSession = useMemo(() => {
     if (!state.activeSessionId) {
       return state.lastSession;
@@ -217,6 +289,8 @@ export const TrackingSessionProvider = ({ children }: { children: ReactNode }) =
     setActiveSessionId,
     clearRecentSessions,
     activeSession,
+    setAnonymousSession,
+    resetState,
   }), [state, activeSession]);
 
   return (

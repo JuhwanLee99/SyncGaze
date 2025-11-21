@@ -1,23 +1,23 @@
 // src/pages/DashboardPage.tsx
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './DashboardPage.css';
 import { useTrackingSession, TrainingSessionSummary } from '../state/trackingSessionContext';
+import { useAuth } from '../state/authContext';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const { recentSessions, setActiveSessionId, calibrationResult } = useTrackingSession();
-  const [userEmail, setUserEmail] = useState('');
+  const { recentSessions, setActiveSessionId, calibrationResult, resetState } = useTrackingSession();
+  const { user, signOut: signOutUser } = useAuth();
 
-  useEffect(() => {
-    const email = localStorage.getItem('userEmail') || 'user@example.com';
-    setUserEmail(email);
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userEmail');
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await signOutUser();
+      resetState();
+      navigate('/');
+    } catch (error) {
+      console.error('Failed to log out', error);
+    }
   };
 
   const handleStartTraining = () => {
@@ -82,7 +82,7 @@ const DashboardPage = () => {
           </button>
           <div className="header-actions">
             <div className="calibration-status">{calibrationMessage}</div>
-            <span className="user-email">{userEmail}</span>
+            <span className="user-email">{user?.displayName || user?.email || 'Account'}</span>
             <button className="logout-button" onClick={handleLogout}>
               Logout
             </button>
