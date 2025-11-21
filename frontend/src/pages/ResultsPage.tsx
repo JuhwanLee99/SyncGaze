@@ -389,6 +389,7 @@ const ResultsPage = () => {
     return { heatmapPoints, baseScreenWidth, baseScreenHeight };
   }, [sessionData]);
 
+  // UPDATED: Heatmap drawing logic to be robust against container resizing
   const drawHeatmap = useCallback(() => {
     const canvas = heatmapCanvasRef.current;
     const container = heatmapContainerRef.current;
@@ -398,6 +399,11 @@ const ResultsPage = () => {
     }
 
     const rect = container.getBoundingClientRect();
+    // If container has no size yet (e.g., during initial render), skip drawing to avoid errors
+    if (rect.width === 0 || rect.height === 0) {
+        return;
+    }
+
     const displayWidth = Math.max(1, Math.round(rect.width));
     const displayHeight = Math.max(1, Math.round(rect.height));
 
@@ -465,13 +471,27 @@ const ResultsPage = () => {
     ctx.restore();
   }, [heatmapPoints]);
 
+  // UPDATED: Use ResizeObserver instead of window.resize
+  // This ensures heatmap draws as soon as the container div has dimensions
   useEffect(() => {
-    const handleResize = () => drawHeatmap();
-    window.addEventListener('resize', handleResize);
-    handleResize();
+    const container = heatmapContainerRef.current;
+    
+    // If heatmap points exist but container is not yet ready, this effect will re-run when it is.
+    if (!container) return;
 
-    return () => window.removeEventListener('resize', handleResize);
-  }, [drawHeatmap, baseScreenWidth, baseScreenHeight]);
+    const resizeObserver = new ResizeObserver(() => {
+      drawHeatmap();
+    });
+
+    resizeObserver.observe(container);
+    
+    // Initial draw attempt
+    drawHeatmap();
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [drawHeatmap, heatmapPoints.length]); // Re-run if points change (causing conditional render of container)
 
   useEffect(() => {
     console.log('📊 Results page mounted - stopping WebGazer');
@@ -488,7 +508,7 @@ const ResultsPage = () => {
     setAutoUploadAttemptedFor(null);
     setAutoUploadStatus(loadStoredUploadStatus(activeSession.id) ?? 'idle');
   }, [activeSession, navigate]);
-
+  
   useEffect(() => {
     if (!sessionData) {
       return;
