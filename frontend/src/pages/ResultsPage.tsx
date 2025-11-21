@@ -13,7 +13,7 @@ import { exportSessionData } from '../utils/sessionExport';
 import { useWebgazer } from '../hooks/tracking/useWebgazer';
 import { useAuth } from '../state/authContext';
 import { persistLatestSession } from '../utils/resultsStorage';
-import { calculatePerformanceAnalytics, PerformanceAnalytics } from '../utils/analytics';
+import { calculatePerformanceAnalytics } from '../utils/analytics';
 
 interface Analytics {
   totalTargets: number;
@@ -274,16 +274,37 @@ const ResultsPage = () => {
   const location = useLocation();
   const {
     activeSession,
+    recentSessions,
     surveyResponses,
     consentAccepted,
     calibrationResult,
+    setActiveSessionId,
   } = useTrackingSession();
   
   const { stopSession } = useWebgazer();
-  
   const { user } = useAuth();
-  const [sessionData, setSessionData] = useState<TrainingSessionSummary | null>(activeSession);
-  const [analytics, setAnalytics] = useState<PerformanceAnalytics | null>(null);
+
+  const locationState = (location.state as { fromTrainingComplete?: boolean; sessionId?: string } | null) ?? null;
+  // ✅ 표시할 세션을 결정하는 로직 개선
+  // Context의 activeSession이 아직 업데이트되지 않았더라도, 
+  // navigate로 전달받은 ID를 이용해 recentSessions에서 데이터를 찾아 사용합니다.
+  const sessionToDisplay = useMemo(() => {
+    if (locationState?.sessionId) {
+      // 1순위: 전달받은 ID로 recentSessions에서 찾기
+      const found = recentSessions.find(s => s.id === locationState.sessionId);
+      if (found) return found;
+    }
+    // 2순위: Context의 activeSession 사용 (새로고침 등)
+    return activeSession;
+  }, [locationState?.sessionId, recentSessions, activeSession]);
+
+  const [sessionData, setSessionData] = useState<TrainingSessionSummary | null>(sessionToDisplay);
+  // 3. analytics를 useMemo로 변경 (useState 제거)
+  // 이렇게 하면 sessionData가 있을 때 즉시 계산되므로 "Loading..." 화면에 갇히지 않음
+  const analytics = useMemo(() => {
+    return sessionData ? calculatePerformanceAnalytics(sessionData.rawData) : null;
+  }, [sessionData]);
+
   const [isExporting, setIsExporting] = useState(false);
   const [autoUploadAttemptedFor, setAutoUploadAttemptedFor] = useState<string | null>(null);
   const [autoUploadStatus, setAutoUploadStatus] = useState<AutoUploadStatus>('idle');
@@ -292,7 +313,6 @@ const ResultsPage = () => {
   const heatmapCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const heatmapContainerRef = useRef<HTMLDivElement | null>(null);
   const participantLabel = user?.email ?? user?.displayName ?? user?.uid;
-  const locationState = (location.state as { fromTrainingComplete?: boolean; sessionId?: string } | null) ?? null;
 
   const accuracySeries = useMemo(
     () => (
@@ -499,15 +519,23 @@ const ResultsPage = () => {
   }, [stopSession]);
 
   useEffect(() => {
-    if (!activeSession) {
+    if (!sessionToDisplay) {
       navigate('/dashboard');
       return;
     }
-    setSessionData(activeSession);
-    setAnalytics(calculatePerformanceAnalytics(activeSession.rawData));
-    setAutoUploadAttemptedFor(null);
-    setAutoUploadStatus(loadStoredUploadStatus(activeSession.id) ?? 'idle');
-  }, [activeSession, navigate]);
+
+    // 현재 표시 중인 세션과 다르다면 업데이트
+    if (sessionData?.id !== sessionToDisplay.id) {
+        setSessionData(sessionToDisplay);
+        setAutoUploadAttemptedFor(null);
+        setAutoUploadStatus(loadStoredUploadStatus(sessionToDisplay.id) ?? 'idle');
+        
+        // Context의 activeSessionId가 다르다면 동기화 (선택 사항)
+        if (activeSession?.id !== sessionToDisplay.id) {
+             setActiveSessionId(sessionToDisplay.id);
+        }
+      }
+  }, [sessionToDisplay, navigate, sessionData, activeSession, setActiveSessionId]);
   
   useEffect(() => {
     if (!sessionData) {

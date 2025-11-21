@@ -26,7 +26,7 @@ const DashboardPage = () => {
 
   const handleViewResults = (sessionId: string) => {
     setActiveSessionId(sessionId);
-    navigate('/results');
+    navigate('/results', { state: { sessionId } });
   };
 
   const stats = useMemo(() => {
