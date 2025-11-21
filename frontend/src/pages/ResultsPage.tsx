@@ -5,22 +5,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './ResultsPage.css';
 import {
-  TrainingDataPoint,
   TrainingSessionSummary,
   useTrackingSession,
 } from '../state/trackingSessionContext';
 import { exportSessionData } from '../utils/sessionExport';
 import { useWebgazer } from '../hooks/tracking/useWebgazer';  // NEW: Import useWebgazer
 import { useAuth } from '../state/authContext';
-
-interface Analytics {
-  totalTargets: number;
-  targetsHit: number;
-  accuracy: number;
-  avgReactionTime: number;
-  gazeAccuracy: number;
-  mouseAccuracy: number;
-}
+import { calculatePerformanceAnalytics, PerformanceAnalytics } from '../utils/analytics';
 
 type AutoUploadStatus = 'idle' | 'success' | 'error' | 'skipped';
 
@@ -66,7 +57,7 @@ const ResultsPage = () => {
   
   const { user } = useAuth();
   const [sessionData, setSessionData] = useState<TrainingSessionSummary | null>(activeSession);
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [analytics, setAnalytics] = useState<PerformanceAnalytics | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [autoUploadAttemptedFor, setAutoUploadAttemptedFor] = useState<string | null>(null);
   const [autoUploadStatus, setAutoUploadStatus] = useState<AutoUploadStatus>('idle');
@@ -87,48 +78,10 @@ const ResultsPage = () => {
       return;
     }
     setSessionData(activeSession);
-    setAnalytics(calculateAnalytics(activeSession.rawData));
+    setAnalytics(calculatePerformanceAnalytics(activeSession.rawData));
     setAutoUploadAttemptedFor(null);
     setAutoUploadStatus(loadStoredUploadStatus(activeSession.id) ?? 'idle');
   }, [activeSession, navigate]);
-
-  const calculateAnalytics = (data: TrainingDataPoint[]): Analytics => {
-    if (data.length === 0) {
-      return {
-        totalTargets: 0,
-        targetsHit: 0,
-        accuracy: 0,
-        avgReactionTime: 0,
-        gazeAccuracy: 0,
-        mouseAccuracy: 0,
-      };
-    }
-
-    const hits = data.filter(d => d.targetHit);
-    const totalTargets = data.filter(d => d.targetId !== null).length || hits.length;
-    const targetsHit = hits.length;
-
-    const reactionTimes = hits.map(d => d.timestamp);
-    const avgReactionTime = reactionTimes.length > 0
-      ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length
-      : 0;
-
-    const dataWithGaze = data.filter(d => d.gazeX !== null && d.gazeY !== null);
-    const dataWithMouse = data.filter(d => d.mouseX !== null && d.mouseY !== null);
-
-    const gazeAccuracy = (dataWithGaze.length / data.length) * 100;
-    const mouseAccuracy = (dataWithMouse.length / data.length) * 100;
-    const accuracy = totalTargets > 0 ? (targetsHit / totalTargets) * 100 : 0;
-
-    return {
-      totalTargets,
-      targetsHit,
-      accuracy,
-      avgReactionTime,
-      gazeAccuracy,
-      mouseAccuracy,
-    };
-  };
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type });
