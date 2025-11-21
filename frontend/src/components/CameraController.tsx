@@ -6,19 +6,16 @@ import { CS2Physics } from '../utils/cs2Physics';
 
 interface CameraControllerProps {
   isActive: boolean;
-  initialPosition?: THREE.Vector3; // Add this
   onPhysicsUpdate?: (position: THREE.Vector3, velocity: THREE.Vector3, physics: CS2Physics) => void;
 }
 
-
 export const CameraController: React.FC<CameraControllerProps> = ({ 
   isActive,
-  initialPosition, // Add this
   onPhysicsUpdate
 }) => {
   const { camera } = useThree();
   const keysPressed = useRef<{ [key: string]: boolean }>({});
-  const physics = useRef(new CS2Physics(initialPosition));
+  const physics = useRef(new CS2Physics());
   const euler = useRef(new THREE.Euler(0, 0, 0, 'YXZ'));
   const mouseSensitivity = 0.002;
 

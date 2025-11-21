@@ -43,12 +43,10 @@ export class CS2Physics {
   private movementState: MovementState;
   private wishDir: THREE.Vector3 = new THREE.Vector3();
   
-  constructor(initialPosition?: THREE.Vector3) {
-    const startPos = initialPosition || new THREE.Vector3(0, CS2_CONSTANTS.HEAD_HEIGHT, 0);
-    
+  constructor() {
     this.movementState = {
       velocity: new THREE.Vector3(),
-      position: startPos.clone(),
+      position: new THREE.Vector3(0, CS2_CONSTANTS.HEAD_HEIGHT, 0),
       isGrounded: true,
       isCrouching: false,
       currentHeight: CS2_CONSTANTS.HEAD_HEIGHT,

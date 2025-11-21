@@ -61,7 +61,7 @@ export const Scene: React.FC<SceneProps> = ({
   
   // Physics state
   const [velocity, setVelocity] = useState(new THREE.Vector3());
-  const [playerPosition, setPlayerPosition] = useState(new THREE.Vector3(0, 1.6, -10));
+  const [playerPosition, setPlayerPosition] = useState(new THREE.Vector3());
   const physicsRef = useRef(new CS2Physics());
   const cameraRotationRef = useRef(new THREE.Euler());
   

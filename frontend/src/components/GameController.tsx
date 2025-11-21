@@ -1,5 +1,5 @@
 // frontend/src/components/GameController.tsx
-// MODIFIED: Only spawns blue (static) targets
+// FIXED: Timer no longer resets when isLocked toggles
 
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
@@ -15,8 +15,9 @@ interface GameControllerProps {
 
 export interface GameControllerRef {
   handleTargetHit: (targetId: string) => void;
-  getActiveTargetId: () => string | null;
+  getActiveTargetId: () => string | null;  // ✅ ADD THIS
 }
+
 
 export const GameController = forwardRef<GameControllerRef, GameControllerProps>(({ 
   isLocked, 
@@ -31,9 +32,10 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
   const { getMouseData, clearMouseData } = useMouseLook(0.002, isLocked);
 
   const spawnTarget = useCallback((elapsedTime: number): Target3D => {
-    // MODIFIED: Always spawn static (blue) targets regardless of elapsed time
-    const phaseType = 'static';  // Always static
-    const isMoving = false;       // Never moving
+    // First 30 seconds: static targets only
+    // 30-60 seconds: moving targets only
+    const phaseType = elapsedTime < 30000 ? 'static' : 'moving';
+    const isMoving = phaseType === 'moving';
 
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.random() * Math.PI;
@@ -50,8 +52,12 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
       position,
       radius: 0.3,
       spawnTime: performance.now(),
-      type: 'static',  // Always static type
-      velocity: undefined  // No velocity for static targets
+      type: isMoving ? 'moving' : 'static',
+      velocity: isMoving ? new THREE.Vector3(
+        (Math.random() - 0.5) * 0.03,
+        (Math.random() - 0.5) * 0.03,
+        (Math.random() - 0.5) * 0.03
+      ) : undefined
     };
   }, []);
 
@@ -107,9 +113,8 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
   // Expose handleTargetHit via ref
   useImperativeHandle(ref, () => ({
     handleTargetHit,
-    getActiveTargetId: () => targets.length > 0 ? targets[0].id : null
+    getActiveTargetId: () => targets.length > 0 ? targets[0].id : null  // ✅ Return first target
   }), [handleTargetHit, targets]);
-
   return (
     <>
       {targets.map(target => (
