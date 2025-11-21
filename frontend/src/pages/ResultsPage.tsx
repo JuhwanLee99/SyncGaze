@@ -1,11 +1,12 @@
 // frontend/src/pages/ResultsPage.tsx
 // UPDATED: Stops WebGazer when mounting results page
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './ResultsPage.css';
 import {
   TrainingSessionSummary,
+  TrainingDataPoint,
   useTrackingSession,
 } from '../state/trackingSessionContext';
 import { exportSessionData } from '../utils/sessionExport';
@@ -24,6 +25,220 @@ interface Analytics {
 import { calculatePerformanceAnalytics, PerformanceAnalytics } from '../utils/analytics';
 
 type AutoUploadStatus = 'idle' | 'success' | 'error' | 'skipped';
+
+type AccuracyPoint = {
+  time: number;
+  accuracy: number;
+  hits: number;
+  total: number;
+};
+
+type AccuracySeriesConfig = {
+  key: string;
+  label: string;
+  color: string;
+  gradientId: string;
+  points: AccuracyPoint[];
+  tooltipLabel: string;
+};
+
+const generateCumulativeSeries = (
+  data: TrainingDataPoint[],
+  duration: number,
+  isHit: (point: TrainingDataPoint) => boolean,
+  shouldCount: (point: TrainingDataPoint) => boolean = () => true,
+): AccuracyPoint[] => {
+  if (!data.length) {
+    return [];
+  }
+
+  const sorted = [...data].sort((a, b) => a.timestamp - b.timestamp);
+  const startTime = sorted[0].timestamp;
+  const buckets = new Map<number, { hits: number; total: number }>();
+
+  sorted.forEach(point => {
+    const elapsedSeconds = Math.max(0, Math.floor((point.timestamp - startTime) / 1000));
+    const bucket = buckets.get(elapsedSeconds) ?? { hits: 0, total: 0 };
+    if (shouldCount(point)) {
+      bucket.total += 1;
+    }
+    if (isHit(point)) {
+      bucket.hits += 1;
+    }
+    buckets.set(elapsedSeconds, bucket);
+  });
+
+  const bucketSeconds = Array.from(buckets.keys());
+  const lastBucket = bucketSeconds.length ? Math.max(...bucketSeconds) : 0;
+  const maxSeconds = Math.max(duration ?? 0, lastBucket);
+
+  let runningHits = 0;
+  let runningTotal = 0;
+  const series: AccuracyPoint[] = [];
+
+  for (let second = 0; second <= maxSeconds; second += 1) {
+    const bucket = buckets.get(second);
+    if (bucket) {
+      runningHits += bucket.hits;
+      runningTotal += bucket.total;
+    }
+
+    const currentAccuracy = runningTotal
+      ? (runningHits / runningTotal) * 100
+      : series.at(-1)?.accuracy ?? 0;
+
+    series.push({
+      time: second,
+      accuracy: currentAccuracy,
+      hits: runningHits,
+      total: runningTotal,
+    });
+  }
+
+  return series;
+};
+
+const AccuracyLineChart = ({ series, duration }: { series: AccuracySeriesConfig[]; duration: number }) => {
+  const activeSeries = series.filter(s => s.points.length);
+
+  if (!activeSeries.length) {
+    return <div className="chart-empty">No accuracy data collected for this session.</div>;
+  }
+
+  const width = 720;
+  const height = 360;
+  const padding = 56;
+  const xMax = Math.max(
+    duration,
+    ...activeSeries.map(s => s.points.at(-1)?.time ?? 0),
+    1,
+  );
+  const yMax = 100;
+
+  const xScale = (time: number) => padding + (time / xMax) * (width - padding * 2);
+  const yScale = (value: number) => height - padding - (value / yMax) * (height - padding * 2);
+
+  const xTicks = 6;
+  const xTickValues = Array.from({ length: xTicks }, (_, i) => Math.round((xMax / (xTicks - 1)) * i));
+  const yTickValues = [0, 25, 50, 75, 100];
+
+  const formatTime = (seconds: number) => `${seconds}s`;
+
+  return (
+    <div className="chart-container">
+      <svg viewBox={`0 0 ${width} ${height}`} className="chart-svg" role="img" aria-label="Accuracy over time">
+        <defs>
+          {activeSeries.map(({ gradientId, color }) => (
+            <linearGradient key={gradientId} id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor={color} stopOpacity="0.95" />
+              <stop offset="100%" stopColor={color} stopOpacity="0.25" />
+            </linearGradient>
+          ))}
+        </defs>
+
+        {/* Axes */}
+        <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} className="chart-axis" />
+        <line x1={padding} y1={padding} x2={padding} y2={height - padding} className="chart-axis" />
+
+        {/* Gridlines */}
+        {xTickValues.map(tick => (
+          <line
+            key={`x-${tick}`}
+            x1={xScale(tick)}
+            x2={xScale(tick)}
+            y1={padding}
+            y2={height - padding}
+            className="chart-grid"
+          />
+        ))}
+        {yTickValues.map(tick => (
+          <line
+            key={`y-${tick}`}
+            x1={padding}
+            x2={width - padding}
+            y1={yScale(tick)}
+            y2={yScale(tick)}
+            className="chart-grid"
+          />
+        ))}
+
+        {/* Axis labels */}
+        {xTickValues.map(tick => (
+          <text key={`xlabel-${tick}`} x={xScale(tick)} y={height - padding + 24} className="chart-label" textAnchor="middle">
+            {formatTime(tick)}
+          </text>
+        ))}
+        {yTickValues.map(tick => (
+          <text
+            key={`ylabel-${tick}`}
+            x={padding - 12}
+            y={yScale(tick) + 4}
+            className="chart-label"
+            textAnchor="end"
+          >
+            {tick}%
+          </text>
+        ))}
+
+        {/* Axis titles */}
+        <text x={(width + padding) / 2} y={height - 12} className="chart-axis-title" textAnchor="middle">
+          Time (seconds)
+        </text>
+        <text
+          x={16}
+          y={height / 2}
+          className="chart-axis-title"
+          textAnchor="middle"
+          transform={`rotate(-90 16 ${height / 2})`}
+        >
+          Accuracy (%)
+        </text>
+
+        {/* Data lines & points */}
+        {activeSeries.map(({ key, points, gradientId, color, tooltipLabel }) => {
+          const pathD = points
+            .map((point, index) => {
+              const prefix = index === 0 ? 'M' : 'L';
+              return `${prefix}${xScale(point.time)},${yScale(point.accuracy)}`;
+            })
+            .join(' ');
+
+          return (
+            <g key={key}>
+              <path d={pathD} className="chart-line" stroke={`url(#${gradientId})`} />
+
+              {points.map(point => (
+                <g key={`${key}-point-${point.time}`}>
+                  <circle
+                    cx={xScale(point.time)}
+                    cy={yScale(point.accuracy)}
+                    r={4}
+                    className="chart-point"
+                    style={{ fill: color }}
+                  />
+                  <title>
+                    {`${tooltipLabel}: ${point.accuracy.toFixed(1)}% at ${formatTime(point.time)} (${point.hits}/${point.total || '0'})`}
+                  </title>
+                </g>
+              ))}
+            </g>
+          );
+        })}
+      </svg>
+      <div className="chart-legend" aria-label="Accuracy legend">
+        {activeSeries.map(({ key, label, color }) => (
+          <div key={key} className="legend-item">
+            <span className="legend-swatch" style={{ backgroundColor: color }} aria-hidden />
+            <span className="legend-label">{label}</span>
+          </div>
+        ))}
+      </div>
+      <div className="chart-caption">
+        Accuracy shown as cumulative percentages over time for targets hit, gaze tracking presence, and mouse tracking.
+      </div>
+    </div>
+  );
+};
 
 const UPLOAD_STATUS_STORAGE_KEY = 'resultsUploadStatus';
 
@@ -75,6 +290,76 @@ const ResultsPage = () => {
   const toastTimeoutRef = useRef<number | null>(null);
   const participantLabel = user?.email ?? user?.displayName ?? user?.uid;
   const locationState = (location.state as { fromTrainingComplete?: boolean; sessionId?: string } | null) ?? null;
+
+  const accuracySeries = useMemo(
+    () => (
+      sessionData
+        ? generateCumulativeSeries(
+            sessionData.rawData,
+            sessionData.duration,
+            point => point.targetHit,
+            point => point.targetId !== null,
+          )
+        : []
+    ),
+    [sessionData],
+  );
+
+  const gazeAccuracySeries = useMemo(
+    () => (
+      sessionData
+        ? generateCumulativeSeries(
+            sessionData.rawData,
+            sessionData.duration,
+            point => point.gazeX !== null && point.gazeY !== null,
+          )
+        : []
+    ),
+    [sessionData],
+  );
+
+  const mouseAccuracySeries = useMemo(
+    () => (
+      sessionData
+        ? generateCumulativeSeries(
+            sessionData.rawData,
+            sessionData.duration,
+            point => point.mouseX !== null && point.mouseY !== null,
+          )
+        : []
+    ),
+    [sessionData],
+  );
+
+  const combinedAccuracySeries = useMemo<AccuracySeriesConfig[]>(
+    () => [
+      {
+        key: 'target-accuracy',
+        label: 'Target Accuracy',
+        color: '#7a5ff5',
+        gradientId: 'line-accuracy',
+        points: accuracySeries,
+        tooltipLabel: 'Target Accuracy',
+      },
+      {
+        key: 'gaze-accuracy',
+        label: 'Gaze Accuracy',
+        color: '#4ecdc4',
+        gradientId: 'line-gaze',
+        points: gazeAccuracySeries,
+        tooltipLabel: 'Gaze Accuracy',
+      },
+      {
+        key: 'mouse-accuracy',
+        label: 'Mouse Accuracy',
+        color: '#ffb86c',
+        gradientId: 'line-mouse',
+        points: mouseAccuracySeries,
+        tooltipLabel: 'Mouse Accuracy',
+      },
+    ],
+    [accuracySeries, gazeAccuracySeries, mouseAccuracySeries],
+  );
 
   // NEW: Stop WebGazer when results page mounts
   useEffect(() => {
@@ -358,18 +643,7 @@ const ResultsPage = () => {
             {/* Accuracy Over Time */}
             <div className="viz-card">
               <h3>Accuracy Over Time</h3>
-              <div className="viz-placeholder">
-                <div className="chart-placeholder">
-                  <div className="chart-line" style={{ height: '60%' }}></div>
-                  <div className="chart-line" style={{ height: '75%' }}></div>
-                  <div className="chart-line" style={{ height: '85%' }}></div>
-                  <div className="chart-line" style={{ height: '70%' }}></div>
-                  <div className="chart-line" style={{ height: '90%' }}></div>
-                </div>
-                <p className="viz-description">
-                  Track your accuracy throughout the training session
-                </p>
-              </div>
+              <AccuracyLineChart series={combinedAccuracySeries} duration={sessionData.duration} />
             </div>
 
             {/* Gaze Heatmap */}

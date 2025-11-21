@@ -181,47 +181,94 @@
   text-align: center;
 }
 
-/* Chart Placeholders */
-.placeholder-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 1rem;
-  height: 150px;
+.chart-container {
+  background: radial-gradient(circle at top left, rgba(102, 126, 234, 0.08), rgba(0, 0, 0, 0.2));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1rem;
   width: 100%;
-  max-width: 300px;
+}
+
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.chart-axis {
+  stroke: rgba(255, 255, 255, 0.4);
+  stroke-width: 1.5;
+}
+
+.chart-grid {
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1;
 }
 
 .chart-line {
-  flex: 1;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 4px 4px 0 0;
-  transition: all 0.3s ease;
+  fill: none;
+  stroke-width: 3;
+  filter: drop-shadow(0 3px 12px rgba(102, 126, 234, 0.35));
 }
 
-.chart-line:hover {
-  opacity: 0.8;
-  transform: scaleY(1.05);
+.chart-point {
+  fill: #4ecdc4;
+  stroke: #0f0c29;
+  stroke-width: 2;
 }
 
-.placeholder-histogram {
+.chart-label {
+  fill: #dfe4ff;
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
+.chart-axis-title {
+  fill: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.chart-caption {
+  margin-top: 0.75rem;
+  color: #b8b8d1;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.chart-legend {
   display: flex;
-  align-items: flex-end;
-  gap: 0.75rem;
-  height: 150px;
-  width: 100%;
-  max-width: 300px;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  justify-content: center;
+  margin-top: 0.75rem;
 }
 
-.hist-bar {
-  flex: 1;
-  background: #667eea;
-  border-radius: 4px 4px 0 0;
-  transition: all 0.3s ease;
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #e7e9ff;
+  font-size: 0.9rem;
 }
 
-.hist-bar:hover {
-  opacity: 0.8;
-  background: #764ba2;
+.legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(15, 12, 41, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.chart-empty {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
+  padding: 1.25rem;
+  text-align: center;
+  color: #b8b8d1;
 }
 
 .heatmap-placeholder {
