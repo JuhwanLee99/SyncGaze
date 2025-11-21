@@ -27,7 +27,7 @@ import './SurveyPage.css';
 const SurveyPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { surveyResponses, setSurveyResponses } = useTrackingSession();
+  const { surveyResponses, setSurveyResponses, activeSession } = useTrackingSession();
   const [formData, setFormData] = useState<SurveyResponses>(
     surveyResponses ?? loadSurveyFromSession() ?? defaultSurveyResponses,
   );
@@ -139,9 +139,12 @@ const SurveyPage = () => {
     setIsSubmitting(true);
 
     try {
+      const sessionId = activeSession?.id ?? null;
+      const uid = user?.uid ?? null;
+
       let submissionFailed = false;
       try {
-        await submitSurveyResponses(formData);
+        await submitSurveyResponses(formData, { sessionId, uid });
       } catch (submissionError) {
         submissionFailed = true;
         console.warn('Survey submission failed, proceeding to next step:', submissionError);

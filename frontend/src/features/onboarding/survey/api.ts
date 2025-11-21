@@ -3,6 +3,8 @@ import { SurveyResponses } from '../../../state/trackingSessionContext';
 interface SubmitSurveyOptions {
   endpoint?: string;
   fetchImpl?: typeof fetch;
+  sessionId?: string | null;
+  uid?: string | null;
 }
 
 const apiBase =
@@ -17,12 +19,23 @@ const normalizeEndpoint = (base: string | null, path: string) => {
 
 export const submitSurveyResponses = async (
   data: SurveyResponses,
-  { endpoint = normalizeEndpoint(apiBase, '/api/submit-survey'), fetchImpl = fetch }: SubmitSurveyOptions = {},
+  {
+    endpoint = normalizeEndpoint(apiBase, '/api/submit-survey'),
+    fetchImpl = fetch,
+    sessionId,
+    uid,
+  }: SubmitSurveyOptions = {},
 ) => {
+  const body = {
+    ...data,
+    ...(sessionId ? { sessionId } : {}),
+    ...(uid ? { uid } : {}),
+  };
+
   const response = await fetchImpl(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
