@@ -13,6 +13,7 @@ import {
 } from '../state/trackingSessionContext';
 import { useAuth } from '../state/authContext';
 import { serializeSessionToCsv } from '../utils/sessionExport';
+import { calculatePerformanceAnalytics } from '../utils/analytics';
 
 const TrainingPage = () => {
   const navigate = useNavigate();
@@ -53,35 +54,9 @@ const TrainingPage = () => {
     }));
   };
 
-  // Calculate metrics from raw data
-  const calculateMetrics = (rawData: TrackingDataRecord[], targetsHit: number) => {
-    const hitRecords = rawData.filter(d => d.hitRegistered);
-    const totalTargets = hitRecords.length;
-    const accuracy = totalTargets > 0 ? (targetsHit / totalTargets) * 100 : 0;
-
-    // Calculate average reaction time (simplified)
-    // This would need proper implementation based on your game mechanics
-    const avgReactionTime = 250; // Placeholder
-
-    // Calculate gaze and mouse accuracy (simplified)
-    const gazeRecords = rawData.filter(d => d.gazeX !== null && d.gazeY !== null);
-    const mouseRecords = rawData.filter(d => d.mouseX !== null && d.mouseY !== null);
-    
-    const gazeAccuracy = gazeRecords.length > 0 ? 75 : 0; // Placeholder
-    const mouseAccuracy = mouseRecords.length > 0 ? 85 : 0; // Placeholder
-
-    return {
-      accuracy,
-      avgReactionTime,
-      gazeAccuracy,
-      mouseAccuracy,
-      totalTargets,
-    };
-  };
-
   const handleTrainingComplete = useCallback((
-    score: number, 
-    targetsHit: number, 
+    score: number,
+    targetsHit: number,
     rawTrackingData: TrackingDataRecord[]
   ) => {
     setIsComplete(true);
@@ -96,9 +71,9 @@ const TrainingPage = () => {
 
     // Convert the raw tracking data to the format expected by the session system
     const convertedData = convertTrainingData(rawTrackingData);
-    
+
     // Calculate metrics from the collected data
-    const metrics = calculateMetrics(rawTrackingData, targetsHit);
+    const metrics = calculatePerformanceAnalytics(convertedData);
     
     // Create the session record with actual data
     const sessionRecord: TrainingSessionSummary = {
@@ -107,7 +82,7 @@ const TrainingPage = () => {
       duration: 60,
       score: score,
       accuracy: metrics.accuracy,
-      targetsHit: targetsHit,
+      targetsHit: metrics.targetsHit,
       totalTargets: metrics.totalTargets,
       avgReactionTime: metrics.avgReactionTime,
       gazeAccuracy: metrics.gazeAccuracy,
