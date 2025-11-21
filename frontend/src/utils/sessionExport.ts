@@ -61,6 +61,8 @@ const convertTrainingData = (data: TrainingDataPoint[]): SessionExportRawDatum[]
   data.map((point, index) => ({
     timestamp: point.timestamp,
     taskId: point.targetId ?? index + 1,
+    targetX: point.targetX,  // ✅ ADD THIS
+    targetY: point.targetY,  // ✅ ADD THIS
     gazeX: point.gazeX,
     gazeY: point.gazeY,
     mouseX: point.mouseX,

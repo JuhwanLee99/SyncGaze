@@ -1,5 +1,7 @@
 // frontend/src/components/TrackingIntegration.tsx
 import { useEffect, useRef, useState } from 'react';
+import { useWebgazer } from '../hooks/tracking/useWebgazer';
+
 
 // Data structure for collected tracking data
 export interface TrackingDataRecord {
