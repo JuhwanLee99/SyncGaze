@@ -1,4 +1,6 @@
-// src/components/GameController.tsx
+// frontend/src/components/GameController.tsx
+// FIXED: Timer no longer resets when isLocked toggles
+
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
 import { Target } from './Target';
@@ -13,7 +15,9 @@ interface GameControllerProps {
 
 export interface GameControllerRef {
   handleTargetHit: (targetId: string) => void;
+  getActiveTargetId: () => string | null;  // ✅ ADD THIS
 }
+
 
 export const GameController = forwardRef<GameControllerRef, GameControllerProps>(({ 
   isLocked, 
@@ -23,12 +27,15 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
   const [targets, setTargets] = useState<Target3D[]>([]);
   const startTimeRef = useRef<number>(0);
   const hasInitialized = useRef<boolean>(false);
+  const gameLoopRef = useRef<number | null>(null);
 
   const { getMouseData, clearMouseData } = useMouseLook(0.002, isLocked);
 
   const spawnTarget = useCallback((elapsedTime: number): Target3D => {
-    const phaseType = elapsedTime < 30000 ? 'static' : elapsedTime < 60000 ? 'moving' : 'mixed';
-    const isMoving = phaseType === 'moving' || (phaseType === 'mixed' && Math.random() > 0.5);
+    // First 30 seconds: static targets only
+    // 30-60 seconds: moving targets only
+    const phaseType = elapsedTime < 30000 ? 'static' : 'moving';
+    const isMoving = phaseType === 'moving';
 
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.random() * Math.PI;
@@ -54,33 +61,41 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
     };
   }, []);
 
+  // Initialize game once when locked first time
   useEffect(() => {
-    if (!isLocked) {
-      hasInitialized.current = false;
-      return;
-    }
+    if (!isLocked || hasInitialized.current) return;
 
-    if (hasInitialized.current) return;
     hasInitialized.current = true;
-
-    console.log('🚀 Initializing game');
+    console.log('🚀 Initializing game - 60 second session');
     startTimeRef.current = performance.now();
     setTargets([spawnTarget(0)]);
 
-    const gameLoop = setInterval(() => {
+    gameLoopRef.current = setInterval(() => {
       const elapsedTime = performance.now() - startTimeRef.current;
 
-      if (elapsedTime > 90000) {
+      if (elapsedTime > 60000) {
+        console.log('⏰ 60 seconds completed');
         onPhaseChange('complete');
-        clearInterval(gameLoop);
+        if (gameLoopRef.current) {
+          clearInterval(gameLoopRef.current);
+          gameLoopRef.current = null;
+        }
       }
     }, 1000);
 
+    console.log('✅ Game loop started');
+  }, [isLocked, spawnTarget, onPhaseChange]);
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
       console.log('🛑 Cleaning up game');
-      clearInterval(gameLoop);
+      if (gameLoopRef.current) {
+        clearInterval(gameLoopRef.current);
+        gameLoopRef.current = null;
+      }
     };
-  }, [isLocked, spawnTarget]);
+  }, []);
 
   const handleTargetHit = useCallback((targetId: string) => {
     console.log('💥 Target hit:', targetId);
@@ -97,9 +112,9 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
 
   // Expose handleTargetHit via ref
   useImperativeHandle(ref, () => ({
-    handleTargetHit
-  }), [handleTargetHit]);
-
+    handleTargetHit,
+    getActiveTargetId: () => targets.length > 0 ? targets[0].id : null  // ✅ Return first target
+  }), [handleTargetHit, targets]);
   return (
     <>
       {targets.map(target => (
@@ -108,3 +123,5 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
     </>
   );
 });
+
+GameController.displayName = 'GameController';

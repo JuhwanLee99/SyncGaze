@@ -173,7 +173,11 @@ const CalibrationPage = () => {
               gazeStability={gazeStability}
               onRecalibrate={handleRecalibrate}
               canProceed={isValidationSuccessful}
-              onProceed={() => navigate('/training')}
+              onProceed={() => {
+                window.webgazer?.showPredictionPoints(false);
+                navigate('/training');
+              }}
+              //onProceed={() => navigate('/training')}
             />
           </div>
         );

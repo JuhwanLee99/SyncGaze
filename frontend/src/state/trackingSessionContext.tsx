@@ -21,7 +21,6 @@ export interface CalibrationResult {
   validationError: number | null;
   completedAt?: string;
 }
-
 export interface TrainingDataPoint {
   timestamp: number;
   gazeX: number | null;
@@ -30,6 +29,8 @@ export interface TrainingDataPoint {
   mouseY: number | null;
   targetHit: boolean;
   targetId: string | null;
+  targetX: number | null;  // ✅ ADD THIS
+  targetY: number | null;  // ✅ ADD THIS
 }
 
 export interface TrainingSessionSummary {
