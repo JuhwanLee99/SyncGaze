@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export interface SurveyResponses {
   ageCheck: boolean;
@@ -67,6 +69,12 @@ export interface TrackingSessionContextValue extends TrackingSessionState {
   resetState: () => void;
 }
 
+export interface SaveSurveyAndConsentPayload {
+  uid: string;
+  surveyResponses?: SurveyResponses;
+  consentTimestamp?: string;
+}
+
 const STORAGE_KEY = 'trackingSessionState';
 
 const defaultSessions: TrainingSessionSummary[] = [
@@ -129,6 +137,44 @@ const createDefaultState = (): TrackingSessionState => {
     activeSessionId: sessions[0]?.id ?? null,
     isAnonymousSession: false,
   };
+};
+
+export const saveSurveyAndConsent = async ({
+  uid,
+  surveyResponses,
+  consentTimestamp,
+}: SaveSurveyAndConsentPayload) => {
+  const writes: Promise<unknown>[] = [];
+
+  if (surveyResponses) {
+    const surveysCollection = collection(db, 'users', uid, 'surveys');
+    writes.push(
+      addDoc(surveysCollection, {
+        ...surveyResponses,
+        createdAt: serverTimestamp(),
+      }),
+    );
+  }
+
+  if (consentTimestamp) {
+    const consentDoc = doc(db, 'users', uid, 'consent', 'latest');
+    writes.push(
+      setDoc(
+        consentDoc,
+        {
+          consentTimestamp,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      ),
+    );
+  }
+
+  if (writes.length === 0) {
+    return;
+  }
+
+  await Promise.all(writes);
 };
 
 export const TrackingSessionContext = createContext<TrackingSessionContextValue | undefined>(undefined);
