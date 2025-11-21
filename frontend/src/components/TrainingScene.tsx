@@ -76,7 +76,9 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
     getCurrentActiveTarget: updateActiveTargetPosition  // ✅ Pass the function
   });
 
-  const { ammo, shoot, reload } = useAmmoSystem(20);
+  //const { ammo, shoot, reload } = useAmmoSystem(20);
+  const ammo = { current: Infinity };
+  const shoot = () => true; // Always return true
   
   // Physics state
   const [velocity, setVelocity] = useState(new THREE.Vector3());
@@ -190,20 +192,9 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
     setPlayerPosition(position);
   }, []);
 
-  // Handle trigger pull
   const handleTriggerPull = useCallback(() => {
-    const didShoot = shoot();
-    
-    if (didShoot) {
-      const isLastShot = ammo.current - 1 === 0;
-      const recoilMultiplier = isLastShot ? 1.5 : 1.0;
-      weaponAnimRef.current?.triggerFire(recoilMultiplier);
-      
-      if (ammo.current === 0) {
-        weaponAnimRef.current?.triggerSlideBack();
-      }
-    }
-  }, [shoot, ammo]);
+    weaponAnimRef.current?.triggerFire(1.0);
+  }, []);
 
   const projectToScreen = (
     worldPos: THREE.Vector3,
@@ -232,12 +223,7 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
   };
   
 
-  // Handle reload
-  const handleReload = useCallback(() => {
-    const isEmpty = ammo.current === 0;
-    reload();
-    weaponAnimRef.current?.triggerReload(isEmpty);
-  }, [reload, ammo]);
+
 
     const handleTargetHit = useCallback((targetId: string, mouseData: any) => {
       setScore(prev => prev + 1);
@@ -312,19 +298,7 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
     }
   }, [exitPointerLock, onComplete, score, getData]);
 
-  // Reload key listener
-  useEffect(() => {
-    if (!isLocked) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'r') {
-        handleReload();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isLocked, handleReload]);
 
   // Mouse click listener - just handles weapon animations
   useEffect(() => {
@@ -350,8 +324,7 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
 
       const handleShoot = (e: MouseEvent) => {
         if (e.button !== 0) return;
-        if (ammo.current <= 0) return;
-
+  
         raycasterRef.current.setFromCamera(new THREE.Vector2(0, 0), camera);
         const intersects = raycasterRef.current.intersectObjects(scene.children, true);
         
@@ -406,7 +379,7 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
   
       <div className="absolute top-4 left-4 text-white z-30">
         <div className="text-2xl font-bold">Score: {score}</div>
-        <div className="text-xl">Ammo: {ammo.current} / 20</div>
+   
         <div className="text-sm text-gray-300">Data: {dataCount} points</div>
       </div>
 
@@ -425,13 +398,14 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
       <Crosshair />
 
       <Canvas>
-        <PerspectiveCamera makeDefault position={[0, 1.6, 0]} fov={90} />
+        <PerspectiveCamera makeDefault position={[0, 1.6, -8]}rotation={[0, Math.PI, 0]} fov={90} />
         <CameraRotationTracker />
         <TargetTracker /> 
         <ShootingController />
         
         <CameraController
           isActive={isLocked}
+          initialPosition={new THREE.Vector3(0, 1.6, -8)} 
           onPhysicsUpdate={handlePhysicsUpdate}
         />
         

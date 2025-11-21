@@ -25,6 +25,7 @@ const CalibrationPage = () => {
     quality,
     setQuality,
     isFaceDetected,
+    stopSession,
     handleWebcamCheckComplete,
     startValidation,
     handleRecalibrate,
@@ -54,8 +55,13 @@ const CalibrationPage = () => {
   ]);
 
   const handleBackToDashboard = () => {
-    navigate('/dashboard', { replace: true });
+    
+    stopSession();  // ADDED: Stop WebGazer before navigating
+    navigate('/dashboard');
   };
+
+
+
 
   const renderContent = () => {
     if (!isReady) {

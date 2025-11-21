@@ -1,5 +1,5 @@
 // frontend/src/hooks/tracking/useWebgazer.tsx
-// UPDATED: Added stopSession() and pauseSession() methods for proper cleanup
+// FIXED: Prevent duplicate overlays and align face tracking properly
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { RECALIBRATION_THRESHOLD } from '../../features/tracker/calibration/constants';
@@ -19,10 +19,11 @@ interface WebgazerContextValue {
   isValidationSuccessful: boolean;
   validationSequence: number;
   quality: QualitySetting;
+  actualResolution: { width: number; height: number } | null;
   isFaceDetected: boolean;
   startSession: () => void;
-  stopSession: () => void;  // NEW: Stop WebGazer completely
-  pauseSession: () => void; // NEW: Pause WebGazer (can be resumed)
+  stopSession: () => void;
+  pauseSession: () => void;
   setQuality: (quality: QualitySetting) => void;
   handleCalibrationComplete: () => void;
   handleWebcamCheckComplete: () => void;
@@ -38,6 +39,256 @@ const CAMERA_SETTINGS: Record<QualitySetting, { width: number; height: number; f
   high: { width: 1920, height: 1080, frameRate: 60 },
 };
 
+const VIEWPORT_SIZE = {
+  width: 320,
+  height: 240
+};
+
+const QUALITY_STORAGE_KEY = 'webgazer_camera_quality';
+
+const getPersistedQuality = (): QualitySetting => {
+  try {
+    const stored = localStorage.getItem(QUALITY_STORAGE_KEY);
+    if (stored && ['low', 'medium', 'high'].includes(stored)) {
+      console.log('📹 Retrieved persisted camera quality:', stored);
+      return stored as QualitySetting;
+    }
+  } catch (error) {
+    console.warn('Failed to retrieve persisted quality:', error);
+  }
+  console.log('📹 Using default camera quality: medium');
+  return 'medium';
+};
+
+// FIXED: Complete cleanup of all WebGazer elements
+const cleanupAllWebgazerElements = () => {
+  console.log('🧹 Cleaning up all WebGazer elements');
+  
+  // Remove all elements with webgazer in the ID
+  const webgazerElements = document.querySelectorAll('[id*="webgazer"]');
+  webgazerElements.forEach(el => {
+    console.log('  Removing:', el.id);
+    el.remove();
+  });
+  
+  // Also remove by class names that WebGazer might use
+  const webgazerClasses = document.querySelectorAll('.webgazer-nav, .webgazer');
+  webgazerClasses.forEach(el => el.remove());
+  
+  // Remove our custom elements
+  const customElements = ['#webgazer-viewport-styles', '#resolution-indicator'];
+  customElements.forEach(selector => {
+    const el = document.querySelector(selector);
+    if (el) el.remove();
+  });
+};
+
+// FIXED: Unified viewport setup that ensures proper alignment
+const setFixedViewport = (qualitySetting: QualitySetting) => {
+  console.log('📐 Setting fixed viewport with proper alignment');
+  
+  // First, ensure no duplicates exist
+  const existingContainers = document.querySelectorAll('#webgazerVideoContainer');
+  if (existingContainers.length > 1) {
+    console.warn('⚠️ Found multiple video containers, removing duplicates');
+    for (let i = 1; i < existingContainers.length; i++) {
+      existingContainers[i].remove();
+    }
+  }
+  
+  const settings = CAMERA_SETTINGS[qualitySetting];
+  const scaleX = VIEWPORT_SIZE.width / settings.width;
+  const scaleY = VIEWPORT_SIZE.height / settings.height;
+  const scale = Math.min(scaleX, scaleY); // Use the smaller scale to maintain aspect ratio
+  
+  // Calculate scaled dimensions
+  const scaledWidth = settings.width * scale;
+  const scaledHeight = settings.height * scale;
+  
+  console.log('📏 Scaling calculations:');
+  console.log('  Original:', `${settings.width}x${settings.height}`);
+  console.log('  Scale factor:', scale);
+  console.log('  Scaled to:', `${scaledWidth}x${scaledHeight}`);
+  
+  setTimeout(() => {
+    // Container style
+    const containerStyle = `
+      position: fixed !important;
+      top: 10px !important;
+      left: 10px !important;
+      width: ${VIEWPORT_SIZE.width}px !important;
+      height: ${VIEWPORT_SIZE.height}px !important;
+      z-index: 9999 !important;
+      overflow: hidden !important;
+      background: black !important;
+    `;
+    
+    // Video element style - maintain aspect ratio
+    const videoStyle = `
+      width: ${VIEWPORT_SIZE.width}px !important;
+      height: ${VIEWPORT_SIZE.height}px !important;
+      object-fit: cover !important;
+      transform: scaleX(-1) !important;
+    `;
+    
+    // Canvas style - MUST match video dimensions exactly
+    const canvasStyle = `
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: ${VIEWPORT_SIZE.width}px !important;
+      height: ${VIEWPORT_SIZE.height}px !important;
+      transform: scaleX(-1) !important;
+      pointer-events: none !important;
+    `;
+    
+    // Apply to container
+    const videoContainer = document.querySelector('#webgazerVideoContainer') as HTMLDivElement;
+    if (videoContainer) {
+      videoContainer.style.cssText = containerStyle;
+      
+      // Ensure container is unique
+      videoContainer.dataset.initialized = 'true';
+    }
+    
+    // Apply to video
+    const videoElement = document.querySelector('#webgazerVideoFeed') as HTMLVideoElement;
+    if (videoElement) {
+      videoElement.style.cssText = videoStyle;
+    }
+    
+    // Apply to ALL canvases - they must all align
+    const videoCanvas = document.querySelector('#webgazerVideoCanvas') as HTMLCanvasElement;
+    if (videoCanvas) {
+      videoCanvas.width = VIEWPORT_SIZE.width;
+      videoCanvas.height = VIEWPORT_SIZE.height;
+      videoCanvas.style.cssText = canvasStyle;
+    }
+    
+    const faceFeedbackBox = document.querySelector('#webgazerFaceFeedbackBox') as HTMLCanvasElement;
+    if (faceFeedbackBox) {
+      // CRITICAL: Face feedback must use same dimensions
+      faceFeedbackBox.width = VIEWPORT_SIZE.width;
+      faceFeedbackBox.height = VIEWPORT_SIZE.height;
+      faceFeedbackBox.style.cssText = canvasStyle + 'z-index: 10001 !important;';
+      
+      // Force WebGazer to recalculate face overlay scaling
+      if (window.webgazer && window.webgazer.getVideoElementCanvas) {
+        try {
+          const canvas = window.webgazer.getVideoElementCanvas();
+          if (canvas) {
+            canvas.width = VIEWPORT_SIZE.width;
+            canvas.height = VIEWPORT_SIZE.height;
+          }
+        } catch (e) {
+          console.warn('Could not update video element canvas:', e);
+        }
+      }
+    }
+    
+    const faceOverlay = document.querySelector('#webgazerFaceOverlay') as HTMLCanvasElement;
+    if (faceOverlay) {
+      faceOverlay.width = VIEWPORT_SIZE.width;
+      faceOverlay.height = VIEWPORT_SIZE.height;
+      faceOverlay.style.cssText = canvasStyle + 'z-index: 10002 !important;';
+    }
+    
+    // Create or update style tag
+    let styleTag = document.querySelector('#webgazer-viewport-styles') as HTMLStyleElement;
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = 'webgazer-viewport-styles';
+      document.head.appendChild(styleTag);
+    }
+    
+    // FIXED: Ensure no duplicate containers can be created
+    styleTag.textContent = `
+      /* Ensure single container */
+      #webgazerVideoContainer {
+        ${containerStyle}
+      }
+      
+      #webgazerVideoContainer[data-initialized="true"] ~ #webgazerVideoContainer {
+        display: none !important;
+      }
+      
+      /* Video element */
+      #webgazerVideoFeed {
+        ${videoStyle}
+      }
+      
+      /* All canvases must align */
+      #webgazerVideoCanvas,
+      #webgazerFaceFeedbackBox,
+      #webgazerFaceOverlay {
+        ${canvasStyle}
+      }
+      
+      #webgazerFaceFeedbackBox {
+        z-index: 10001 !important;
+      }
+      
+      #webgazerFaceOverlay {
+        z-index: 10002 !important;
+      }
+      
+      /* Gaze dot */
+      #webgazerGazeDot {
+        position: fixed !important;
+        z-index: 10003 !important;
+      }
+      
+      /* Resolution indicator */
+      #resolution-indicator {
+        position: fixed;
+        top: 260px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 12px;
+        z-index: 10000;
+        font-family: monospace;
+      }
+    `;
+    
+    console.log('✅ Viewport styling applied');
+  }, 500);
+};
+
+// Verify actual resolution
+const verifyActualResolution = (qualitySetting: QualitySetting): Promise<{ width: number; height: number }> => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const videoElement = document.querySelector('#webgazerVideoFeed') as HTMLVideoElement;
+      
+      if (videoElement) {
+        const actualWidth = videoElement.videoWidth;
+        const actualHeight = videoElement.videoHeight;
+        const expected = CAMERA_SETTINGS[qualitySetting];
+        
+        console.log('🔍 Resolution Verification:');
+        console.log('   Quality Setting:', qualitySetting);
+        console.log('   Expected:', `${expected.width}x${expected.height}`);
+        console.log('   Actual:', `${actualWidth}x${actualHeight}`);
+        console.log('   Display:', `${VIEWPORT_SIZE.width}x${VIEWPORT_SIZE.height}`);
+        
+        if (actualWidth === expected.width && actualHeight === expected.height) {
+          console.log('✅ Resolution matches!');
+        } else if (actualWidth > 0 && actualHeight > 0) {
+          console.warn('⚠️ Resolution differs (camera limitation)');
+        }
+        
+        resolve({ width: actualWidth, height: actualHeight });
+      } else {
+        console.error('❌ Video element not found');
+        resolve({ width: 0, height: 0 });
+      }
+    }, 1000);
+  });
+};
+
 const WebgazerContext = createContext<WebgazerContextValue | undefined>(undefined);
 
 export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
@@ -49,15 +300,34 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
   const [calStage3SuccessRate, setCalStage3SuccessRate] = useState<number | null>(null);
   const [isValidationSuccessful, setIsValidationSuccessful] = useState(false);
   const [validationSequence, setValidationSequence] = useState(0);
-  const [quality, setQuality] = useState<QualitySetting>('high');
+  const [quality, setQualityState] = useState<QualitySetting>(getPersistedQuality);
+  const [actualResolution, setActualResolution] = useState<{ width: number; height: number } | null>(null);
   const [isFaceDetected, setIsFaceDetected] = useState(false);
   
   const updateQuality = useCallback((nextQuality: QualitySetting) => {
-    setQuality(nextQuality);
-  }, []);
+    console.log('📹 Setting camera quality:', nextQuality);
+    setQualityState(nextQuality);
+    
+    try {
+      localStorage.setItem(QUALITY_STORAGE_KEY, nextQuality);
+    } catch (error) {
+      console.warn('Failed to persist quality:', error);
+    }
+    
+    if (hasWebgazerStarted.current && window.webgazer) {
+      console.log('🔄 Restarting with new quality');
+      const currentGameState = gameState;
+      safelyEndWebgazer();
+      setTimeout(() => {
+        startSessionWithQuality(nextQuality);
+        setGameState(currentGameState);
+      }, 200); // Slightly longer delay for cleanup
+    }
+  }, [gameState]);
 
   const validationGazePoints = useRef<{ x: number; y: number }[]>([]);
   const hasWebgazerStarted = useRef(false);
+  const startupLock = useRef(false); // FIXED: Prevent concurrent starts
 
   const safelyEndWebgazer = useCallback(() => {
     if (!window.webgazer || !hasWebgazerStarted.current) {
@@ -65,11 +335,16 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     }
     try {
       console.log('🛑 Stopping WebGazer');
+      window.webgazer.clearGazeListener();
+      window.webgazer.pause();
       window.webgazer.end();
+      cleanupAllWebgazerElements();
     } catch (error) {
       console.error('Failed to stop WebGazer', error);
     } finally {
       hasWebgazerStarted.current = false;
+      startupLock.current = false;
+      setActualResolution(null);
     }
   }, []);
 
@@ -105,20 +380,17 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [safelyEndWebgazer]);
 
-  // Show/hide prediction points based on game state
+  // Show/hide prediction points
   useEffect(() => {
-    if (!isReady || !window.webgazer) {
-      return;
-    }
+    if (!isReady || !window.webgazer) return;
     const shouldShow = gameState === 'validating' || gameState === 'calibrating';
     window.webgazer.showPredictionPoints(shouldShow);
   }, [gameState, isReady]);
 
-  // Face detection for webcam check
+  // Face detection
   useEffect(() => {
-    if (gameState !== 'webcamCheck' || !window.webgazer) {
-      return;
-    }
+    if (gameState !== 'webcamCheck' || !window.webgazer) return;
+    
     setIsFaceDetected(false);
     const detectionListener = (data: { x: number; y: number } | null) => {
       if (data?.x != null && data?.y != null) {
@@ -133,30 +405,33 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [gameState]);
 
-  // Start WebGazer session
-  const startSession = useCallback(() => {
-    if (!isReady || !window.webgazer) {
+  // Start session with specific quality
+  const startSessionWithQuality = useCallback(async (qualitySetting: QualitySetting) => {
+    if (!isReady || !window.webgazer) return;
+    
+    // FIXED: Prevent duplicate starts
+    if (startupLock.current) {
+      console.warn('⚠️ WebGazer startup already in progress');
       return;
     }
-    console.log('▶️ Starting WebGazer session');
+    startupLock.current = true;
+    
+    // FIXED: Clean up any existing elements first
+    cleanupAllWebgazerElements();
+    
+    console.log('🚀 Starting WebGazer session');
+    console.log('   Quality:', qualitySetting);
+    console.log('   Target:', CAMERA_SETTINGS[qualitySetting]);
+    
     setValidationError(null);
     setGazeStability(null);
     setCalStage3SuccessRate(null);
     setIsValidationSuccessful(false);
     validationGazePoints.current = [];
 
-    window.webgazer.setTracker('TFFacemesh');
-    window.webgazer.setRegression('ridge');
-    if (window.webgazer.params) {
-      window.webgazer.params.checkClick = false;
-      window.webgazer.params.checkMove = false;
-    }
-    window.webgazer.begin();
-    hasWebgazerStarted.current = true;
-    window.webgazer.applyKalmanFilter(USE_KALMAN_FILTER);
-
+    // Set constraints BEFORE begin()
     if (window.webgazer.setCameraConstraints) {
-      const settings = CAMERA_SETTINGS[quality];
+      const settings = CAMERA_SETTINGS[qualitySetting];
       window.webgazer.setCameraConstraints({
         video: {
           width: { ideal: settings.width },
@@ -166,10 +441,47 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
       });
     }
 
-    setGameState('webcamCheck');
-  }, [isReady, quality]);
+    window.webgazer.setTracker('TFFacemesh');
+    window.webgazer.setRegression('ridge');
+    
+    if (window.webgazer.params) {
+      window.webgazer.params.checkClick = false;
+      window.webgazer.params.checkMove = false;
+    }
+    
+    window.webgazer.begin();
+    hasWebgazerStarted.current = true;
+    window.webgazer.applyKalmanFilter(USE_KALMAN_FILTER);
 
-  // NEW: Stop WebGazer session completely
+    // Apply viewport with quality for proper scaling
+    setFixedViewport(qualitySetting);
+    
+    // Verify resolution
+    const resolution = await verifyActualResolution(qualitySetting);
+    setActualResolution(resolution);
+    
+    // Update indicator
+    let indicator = document.querySelector('#resolution-indicator') as HTMLDivElement;
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.id = 'resolution-indicator';
+      document.body.appendChild(indicator);
+    }
+    indicator.textContent = `${qualitySetting.toUpperCase()}: ${resolution.width}x${resolution.height} → ${VIEWPORT_SIZE.width}x${VIEWPORT_SIZE.height}`;
+    
+    // Apply viewport again to ensure alignment
+    setTimeout(() => setFixedViewport(qualitySetting), 1000);
+    
+    startupLock.current = false;
+    setGameState('webcamCheck');
+  }, [isReady]);
+
+  // Start WebGazer session
+  const startSession = useCallback(() => {
+    startSessionWithQuality(quality);
+  }, [quality, startSessionWithQuality]);
+
+  // Stop WebGazer session
   const stopSession = useCallback(() => {
     console.log('🛑 Stopping WebGazer session');
     safelyEndWebgazer();
@@ -177,7 +489,7 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     setLiveGaze({ x: null, y: null });
   }, [safelyEndWebgazer]);
 
-  // NEW: Pause WebGazer session (can be resumed)
+  // Pause WebGazer session
   const pauseSession = useCallback(() => {
     console.log('⏸️ Pausing WebGazer session');
     safelyPauseWebgazer();
@@ -188,14 +500,8 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     setGameState('calibrating');
   }, []);
 
-  /*
   const handleCalibrationComplete = useCallback(() => {
-    setGameState('validating');
-  }, []);
-  */
-
-  const handleCalibrationComplete = useCallback(() => {
-    setGameState('confirmValidation');  // ✅ Show confirmation first
+    setGameState('confirmValidation');
   }, []);
 
   const handleRecalibrate = useCallback(() => {
@@ -220,17 +526,10 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     setGameState('validating');
   }, []);
 
-  
   // Live gaze tracking
   useEffect(() => {
-    if (!isReady || !window.webgazer) {
-      return;
-    }
-    
-    // Update liveGaze during both calibration (Stage 3) AND validation
-    if (gameState !== 'validating' && gameState !== 'calibrating') {
-      return;
-    }
+    if (!isReady || !window.webgazer) return;
+    if (gameState !== 'validating' && gameState !== 'calibrating') return;
 
     const gazeListener = (data: { x: number; y: number } | null) => {
       if (data?.x != null && data?.y != null) {
@@ -246,9 +545,7 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
 
   // Validation measurement
   useEffect(() => {
-    if (gameState !== 'validating' || !window.webgazer) {
-      return;
-    }
+    if (gameState !== 'validating' || !window.webgazer) return;
 
     validationGazePoints.current = [];
     const validationListener = (data: { x: number; y: number } | null) => {
@@ -310,10 +607,11 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     isValidationSuccessful,
     validationSequence,
     quality,
+    actualResolution,
     isFaceDetected,
     startSession,
-    stopSession,      // NEW
-    pauseSession,     // NEW
+    stopSession,
+    pauseSession,
     setQuality: updateQuality,
     handleCalibrationComplete,
     handleWebcamCheckComplete,
