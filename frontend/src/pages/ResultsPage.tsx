@@ -19,6 +19,35 @@ interface Analytics {
   mouseAccuracy: number;
 }
 
+type AutoUploadStatus = 'idle' | 'success' | 'error' | 'skipped';
+
+const UPLOAD_STATUS_STORAGE_KEY = 'resultsUploadStatus';
+
+const loadStoredUploadStatus = (sessionId: string | undefined): AutoUploadStatus | null => {
+  if (!sessionId) return null;
+  try {
+    const stored = window.sessionStorage.getItem(UPLOAD_STATUS_STORAGE_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as Record<string, AutoUploadStatus>;
+    return parsed[sessionId] ?? null;
+  } catch (error) {
+    console.warn('Failed to read upload status from storage', error);
+    return null;
+  }
+};
+
+const persistUploadStatus = (sessionId: string | undefined, status: AutoUploadStatus) => {
+  if (!sessionId) return;
+  try {
+    const stored = window.sessionStorage.getItem(UPLOAD_STATUS_STORAGE_KEY);
+    const parsed = stored ? (JSON.parse(stored) as Record<string, AutoUploadStatus>) : {};
+    parsed[sessionId] = status;
+    window.sessionStorage.setItem(UPLOAD_STATUS_STORAGE_KEY, JSON.stringify(parsed));
+  } catch (error) {
+    console.warn('Failed to persist upload status to storage', error);
+  }
+};
+
 const ResultsPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,7 +62,7 @@ const ResultsPage = () => {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [autoUploadAttemptedFor, setAutoUploadAttemptedFor] = useState<string | null>(null);
-  const [autoUploadStatus, setAutoUploadStatus] = useState<'idle' | 'success' | 'error' | 'skipped'>('idle');
+  const [autoUploadStatus, setAutoUploadStatus] = useState<AutoUploadStatus>('idle');
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
   const participantLabel = user?.email ?? user?.displayName ?? user?.uid;
@@ -47,7 +76,7 @@ const ResultsPage = () => {
     setSessionData(activeSession);
     setAnalytics(calculateAnalytics(activeSession.rawData));
     setAutoUploadAttemptedFor(null);
-    setAutoUploadStatus('idle');
+    setAutoUploadStatus(loadStoredUploadStatus(activeSession.id) ?? 'idle');
   }, [activeSession, navigate]);
 
   const calculateAnalytics = (data: TrainingDataPoint[]): Analytics => {
@@ -176,7 +205,9 @@ const ResultsPage = () => {
 
     const attemptAutoUpload = async () => {
       const success = await handleExport({ upload: true, download: false });
-      setAutoUploadStatus(success ? 'success' : 'error');
+      const status = success ? 'success' : 'error';
+      setAutoUploadStatus(status);
+      persistUploadStatus(sessionData.id, status);
     };
 
     attemptAutoUpload();
@@ -192,8 +223,10 @@ const ResultsPage = () => {
 
   const handleManualUpload = useCallback(async () => {
     const success = await handleExport({ upload: true, download: false });
-    setAutoUploadStatus(success ? 'success' : 'error');
-  }, [handleExport]);
+    const status = success ? 'success' : 'error';
+    setAutoUploadStatus(status);
+    persistUploadStatus(sessionData?.id, status);
+  }, [handleExport, sessionData?.id]);
 
   if (!sessionData || !analytics) {
     return (
