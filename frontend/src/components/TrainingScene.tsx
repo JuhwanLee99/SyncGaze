@@ -25,6 +25,7 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const { isLocked, requestPointerLock, exitPointerLock } = usePointerLock(canvasRef);
   const [score, setScore] = useState(0);
+  const scoreRef = useRef(0); // ADD THIS
   const [timeRemaining, setTimeRemaining] = useState(60);
   const [liveGaze, setLiveGaze] = useState<LiveGaze>({ x: null, y: null });
   
@@ -240,7 +241,11 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
 
 
     const handleTargetHit = useCallback((targetId: string, mouseData: any) => {
-      setScore(prev => prev + 1);
+      setScore(prev => {
+        const newScore = prev + 1;
+        scoreRef.current = newScore; // ADD THIS
+        return newScore;
+      });
       
       // Find the actual target in the scene - need to search recursively
       let target3DPos = new THREE.Vector3(0, 0, 0);
@@ -295,23 +300,19 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
     if (newPhase === 'complete') {
       exitPointerLock();
       
-      // Get the collected training data
       const collectedData = getData();
-      
-      // Count actual target hits from the data
       const targetsHit = collectedData.filter(d => d.hitRegistered).length;
       
       console.log('✅ Training complete:', {
-        score,
+        score: scoreRef.current, // USE REF HERE
         targetsHit,
         dataPointsCollected: collectedData.length
       });
       
-      // Pass data to parent
-      onComplete?.(score, targetsHit, collectedData);
+      // Pass the ref value
+      onComplete?.(scoreRef.current, targetsHit, collectedData); // USE REF HERE
     }
-  }, [exitPointerLock, onComplete, score, getData]);
-
+  }, [exitPointerLock, onComplete, getData]); 
 
   // Mouse click listener - just handles weapon animations
   useEffect(() => {

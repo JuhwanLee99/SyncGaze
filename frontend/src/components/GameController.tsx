@@ -30,7 +30,29 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
   const hasInitialized = useRef<boolean>(false);
   const gameLoopRef = useRef<number | null>(null);
 
+  const pausedTimeRef = useRef<number>(0);
+  const totalPausedDurationRef = useRef<number>(0);
+  const wasLockedRef = useRef<boolean>(false);
+
+  
   const { getMouseData, clearMouseData } = useMouseLook(0.002, isLocked);
+
+  // ADD THIS ENTIRE useEffect:
+  useEffect(() => {
+    if (isLocked && !wasLockedRef.current && pausedTimeRef.current > 0) {
+      // Just resumed
+      const pauseDuration = performance.now() - pausedTimeRef.current;
+      totalPausedDurationRef.current += pauseDuration;
+      pausedTimeRef.current = 0;
+      console.log('▶️ GameController resumed, paused for:', pauseDuration, 'ms');
+    } else if (!isLocked && wasLockedRef.current) {
+      // Just paused
+      pausedTimeRef.current = performance.now();
+      console.log('⏸️ GameController paused');
+    }
+    wasLockedRef.current = isLocked;
+  }, [isLocked]);
+
 
   const spawnTarget = useCallback((elapsedTime: number): Target3D => {
     // First 30 seconds: static targets only
@@ -55,9 +77,9 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
       spawnTime: performance.now(),
       type: isMoving ? 'moving' : 'static',
       velocity: isMoving ? new THREE.Vector3(
-        (Math.random() - 0.5) * 0.3,
-        (Math.random() - 0.5) * 0.3,
-        (Math.random() - 0.5) * 0.3
+        (Math.random() - 0.5) * 0.24,
+        (Math.random() - 0.5) * 0.24,
+        (Math.random() - 0.5) * 0.24
       ) : undefined
     };
   }, []);
@@ -126,7 +148,8 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
     setTargets([spawnTarget(0)]);
 
     gameLoopRef.current = setInterval(() => {
-      const elapsedTime = performance.now() - startTimeRef.current;
+      if (!isLocked) return;
+      const elapsedTime = performance.now() - startTimeRef.current - totalPausedDurationRef.current;
 
       if (elapsedTime > 60000) {
         console.log('⏰ 60 seconds completed');
