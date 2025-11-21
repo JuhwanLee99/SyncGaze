@@ -90,6 +90,8 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
   const gameControllerRef = useRef<GameControllerRef | null>(null);
   const weaponAnimRef = useRef<GlockModelRef | null>(null);
   const timerStartTime = useRef<number>(0);
+  const pausedTime = useRef<number>(0);
+  const totalPausedDuration = useRef<number>(0);
 
   const cameraRef = useRef<THREE.Camera | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -116,19 +118,35 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
 
   // Timer - calculate based on elapsed time
   useEffect(() => {
-    if (!isLocked) return;
-
-    // Only set start time if not already set
-    if (timerStartTime.current === 0) {
+    // Start timer on first lock
+    if (isLocked && timerStartTime.current === 0) {
       timerStartTime.current = Date.now();
-      console.log('⏰ Timer started at:', timerStartTime.current);
+      console.log('⏰ Timer started');
     }
 
+    // Track pause/resume
+    if (!isLocked && timerStartTime.current > 0) {
+      // Just paused
+      if (pausedTime.current === 0) {
+        pausedTime.current = Date.now();
+        console.log('⏸️ Game paused');
+      }
+    } else if (isLocked && pausedTime.current > 0) {
+      // Just resumed
+      const pauseDuration = Date.now() - pausedTime.current;
+      totalPausedDuration.current += pauseDuration;
+      pausedTime.current = 0;
+      console.log('▶️ Game resumed, paused for:', pauseDuration, 'ms');
+    }
+
+    if (!isLocked) return; // Don't update timer while paused
+
     const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - timerStartTime.current) / 1000);
+      const elapsed = Math.floor(
+        (Date.now() - timerStartTime.current - totalPausedDuration.current) / 1000
+      );
       const remaining = Math.max(0, 60 - elapsed);
       
-      console.log(`⏱️ Elapsed: ${elapsed}s, Remaining: ${remaining}s`);
       setTimeRemaining(remaining);
 
       if (remaining <= 0) {
@@ -136,10 +154,7 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
       }
     }, 100);
 
-    return () => {
-      console.log('🛑 Clearing timer');
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, [isLocked]);
 
   // Camera rotation tracker component
@@ -374,9 +389,25 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
 
   return (
     <div ref={canvasRef} className="w-screen h-screen fixed inset-0">
+      
+      {!isLocked && (
+      <div 
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center cursor-pointer"
+        onClick={requestPointerLock}  // Add this
+      >
+        <div className="bg-black/80 px-8 py-6 rounded-lg border-2 border-white/30">
+          <h2 className="text-3xl font-bold text-white mb-4 text-center">Paused</h2>
+          <p className="text-white text-lg text-center">
+            Click anywhere to resume
+          </p>
+          <p className="text-gray-400 text-sm text-center mt-2">
+            Timer: {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+          </p>
+        </div>
+      </div>
+    )}
   
-  
-      <div className="absolute top-4 left-4 text-white z-30">
+      <div className="absolute top-4 right-4 text-white z-30">
         <div className="text-2xl font-bold">Score: {score}</div>
         
         <div className="text-sm text-gray-300">Data: {dataCount} points</div>
@@ -389,7 +420,6 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
             <div className={`text-4xl font-bold font-mono ${timeRemaining <= 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
               {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
             </div>
-            <div className="text-xs text-yellow-300 mt-1">Debug: {timeRemaining}s</div>
           </div>
         </div>
       </div>

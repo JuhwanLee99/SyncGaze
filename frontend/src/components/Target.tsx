@@ -34,24 +34,8 @@ export const Target: React.FC<TargetProps> = ({ target, onHit }) => {
   useFrame((state, delta) => {
     if (!meshRef.current) return;
 
-    // Moving target logic
-    if (target.type === 'moving' && target.velocity) {
-      meshRef.current.position.add(target.velocity.clone().multiplyScalar(delta * 60));
-      
-      // Boundary check with reflection
-      const pos = meshRef.current.position;
-      if (Math.abs(pos.x) > 4.5) {
-        target.velocity.x *= -1;
-        pos.x = Math.sign(pos.x) * 4.5;
-      }
-      if (Math.abs(pos.y) > 4.5) {
-        target.velocity.y *= -1;
-        pos.y = Math.sign(pos.y) * 4.5;
-      }
-      if (Math.abs(pos.z) > 4.5) {
-        target.velocity.z *= -1;
-        pos.z = Math.sign(pos.z) * 4.5;
-      }
+    if (meshRef.current) {
+      meshRef.current.position.copy(target.position);
     }
 
     // Hover scale animation

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHand
 import * as THREE from 'three';
 import { Target } from './Target';
 import { useMouseLook } from '../hooks/useMouseLook';
+import { useFrame } from '@react-three/fiber';
 import type { Target3D } from '../types';
 
 interface GameControllerProps {
@@ -34,7 +35,7 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
   const spawnTarget = useCallback((elapsedTime: number): Target3D => {
     // First 30 seconds: static targets only
     // 30-60 seconds: moving targets only
-    const phaseType = elapsedTime < 30000 ? 'static' : 'moving';
+    const phaseType = elapsedTime < 20000 ? 'static' : 'moving';
     const isMoving = phaseType === 'moving';
 
     const theta = Math.random() * Math.PI * 2;
@@ -54,12 +55,66 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
       spawnTime: performance.now(),
       type: isMoving ? 'moving' : 'static',
       velocity: isMoving ? new THREE.Vector3(
-        (Math.random() - 0.5) * 0.03,
-        (Math.random() - 0.5) * 0.03,
-        (Math.random() - 0.5) * 0.03
+        (Math.random() - 0.5) * 0.3,
+        (Math.random() - 0.5) * 0.3,
+        (Math.random() - 0.5) * 0.3
       ) : undefined
     };
   }, []);
+
+  useFrame(() => {
+    if (!isLocked) return;
+
+    setTargets(prev => prev.map(target => {
+      if (target.type !== 'moving' || !target.velocity) return target;
+
+      const newPosition = target.position.clone();
+      const newVelocity = target.velocity.clone();
+
+      // Room boundaries
+      const bounds = {
+        minX: -4.7,
+        maxX: 4.7,
+        minY: 0.8,
+        maxY: 9.7,
+        minZ: -4.7,
+        maxZ: 4.7
+      };
+
+      // Predict next position
+      const nextPosition = target.position.clone().add(target.velocity);
+
+      // X boundaries
+      if (nextPosition.x < bounds.minX || nextPosition.x > bounds.maxX) {
+        newVelocity.x *= -1;
+        newPosition.x = THREE.MathUtils.clamp(target.position.x, bounds.minX, bounds.maxX);
+      } else {
+        newPosition.x = nextPosition.x;
+      }
+
+      // Y boundaries
+      if (nextPosition.y < bounds.minY || nextPosition.y > bounds.maxY) {
+        newVelocity.y *= -1;
+        newPosition.y = THREE.MathUtils.clamp(target.position.y, bounds.minY, bounds.maxY);
+      } else {
+        newPosition.y = nextPosition.y;
+      }
+
+      // Z boundaries
+      if (nextPosition.z < bounds.minZ || nextPosition.z > bounds.maxZ) {
+        newVelocity.z *= -1;
+        newPosition.z = THREE.MathUtils.clamp(target.position.z, bounds.minZ, bounds.maxZ);
+      } else {
+        newPosition.z = nextPosition.z;
+      }
+
+      return {
+        ...target,
+        position: newPosition,
+        velocity: newVelocity
+      };
+    }));
+  });
 
   // Initialize game once when locked first time
   useEffect(() => {
