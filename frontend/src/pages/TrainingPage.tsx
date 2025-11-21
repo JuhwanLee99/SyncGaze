@@ -20,6 +20,7 @@ const TrainingPage = () => {
     calibrationResult,
     surveyResponses,
     consentAccepted,
+    activeSessionId,
   } = useTrackingSession();
   const { user } = useAuth();
   const [timeRemaining, setTimeRemaining] = useState(60);
@@ -144,7 +145,12 @@ const TrainingPage = () => {
   };
 
   const handleViewResults = () => {
-    navigate('/results');
+    navigate('/results', {
+      state: {
+        fromTrainingComplete: true,
+        sessionId: activeSessionId ?? null,
+      },
+    });
   };
 
   const handleBackToDashboard = () => {

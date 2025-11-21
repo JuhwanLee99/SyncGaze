@@ -1,6 +1,6 @@
 // src/pages/ResultsPage.tsx
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import './ResultsPage.css';
 import {
   TrainingDataPoint,
@@ -21,6 +21,7 @@ interface Analytics {
 
 const ResultsPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     activeSession,
     surveyResponses,
@@ -31,9 +32,12 @@ const ResultsPage = () => {
   const [sessionData, setSessionData] = useState<TrainingSessionSummary | null>(activeSession);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [autoUploadAttemptedFor, setAutoUploadAttemptedFor] = useState<string | null>(null);
+  const [autoUploadStatus, setAutoUploadStatus] = useState<'idle' | 'success' | 'error' | 'skipped'>('idle');
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
   const participantLabel = user?.email ?? user?.displayName ?? user?.uid;
+  const locationState = (location.state as { fromTrainingComplete?: boolean; sessionId?: string } | null) ?? null;
 
   useEffect(() => {
     if (!activeSession) {
@@ -42,6 +46,8 @@ const ResultsPage = () => {
     }
     setSessionData(activeSession);
     setAnalytics(calculateAnalytics(activeSession.rawData));
+    setAutoUploadAttemptedFor(null);
+    setAutoUploadStatus('idle');
   }, [activeSession, navigate]);
 
   const calculateAnalytics = (data: TrainingDataPoint[]): Analytics => {
@@ -97,9 +103,9 @@ const ResultsPage = () => {
   }, []);
 
   const handleExport = useCallback(
-    async ({ upload }: { upload?: boolean } = {}) => {
+    async ({ upload, download = true }: { upload?: boolean; download?: boolean } = {}) => {
       if (!sessionData) {
-        return;
+        return false;
       }
 
       try {
@@ -115,7 +121,7 @@ const ResultsPage = () => {
           },
           {
             filename: `training-session-${sessionData.id}.csv`,
-            download: true,
+            download,
             upload: Boolean(upload),
             uploadOptions: {
               sessionId: sessionData.id,
@@ -127,10 +133,13 @@ const ResultsPage = () => {
         const successMessage = upload
           ? uploadPath
             ? `CSV uploaded to Firebase Storage: ${uploadPath}`
-            : 'CSV downloaded and uploaded successfully.'
+            : download
+              ? 'CSV downloaded and uploaded successfully.'
+              : 'CSV uploaded successfully.'
           : 'CSV downloaded successfully.';
 
         showToast(successMessage, 'success');
+        return true;
       } catch (error) {
         console.error('Failed to export session data', error);
         const message = error instanceof Error ? error.message : 'Unexpected error occurred.';
@@ -138,12 +147,40 @@ const ResultsPage = () => {
           upload ? `CSV upload failed: ${message}` : `CSV export failed: ${message}`,
           'error',
         );
+        return false;
       } finally {
         setIsExporting(false);
       }
     },
     [calibrationResult, consentAccepted, participantLabel, sessionData, showToast, surveyResponses, user],
   );
+
+  useEffect(() => {
+    if (!sessionData) {
+      return;
+    }
+
+    const fromTrainingComplete = Boolean(locationState?.fromTrainingComplete);
+    const sessionMatches = !locationState?.sessionId || locationState.sessionId === sessionData.id;
+
+    if (!fromTrainingComplete || !sessionMatches) {
+      setAutoUploadStatus(status => (status === 'idle' ? 'skipped' : status));
+      return;
+    }
+
+    if (autoUploadAttemptedFor === sessionData.id) {
+      return;
+    }
+
+    setAutoUploadAttemptedFor(sessionData.id);
+
+    const attemptAutoUpload = async () => {
+      const success = await handleExport({ upload: true, download: false });
+      setAutoUploadStatus(success ? 'success' : 'error');
+    };
+
+    attemptAutoUpload();
+  }, [autoUploadAttemptedFor, handleExport, locationState, sessionData]);
 
   const handleTrainAgain = () => {
     navigate('/calibration');
@@ -152,6 +189,11 @@ const ResultsPage = () => {
   const handleBackToDashboard = () => {
     navigate('/dashboard');
   };
+
+  const handleManualUpload = useCallback(async () => {
+    const success = await handleExport({ upload: true, download: false });
+    setAutoUploadStatus(success ? 'success' : 'error');
+  }, [handleExport]);
 
   if (!sessionData || !analytics) {
     return (
@@ -259,6 +301,9 @@ const ResultsPage = () => {
         <section className="data-section">
           <h2>Session Data</h2>
           <div className="data-actions">
+            {autoUploadStatus === 'error' && (
+              <span className="upload-status error">Automatic upload failed. You can retry below.</span>
+            )}
             <button
               className="download-button"
               onClick={() => handleExport({ upload: false })}
@@ -266,13 +311,23 @@ const ResultsPage = () => {
             >
               {isExporting ? 'Preparing…' : 'Download CSV'}
             </button>
-            <button
-              className="upload-button"
-              onClick={() => handleExport({ upload: true })}
-              disabled={isExporting}
-            >
-              {isExporting ? 'Uploading…' : 'Upload to Firebase Storage'}
-            </button>
+            {autoUploadStatus === 'success' ? (
+              <span className="upload-status success upload-status-inline">
+                CSV automatically uploaded to Firebase Storage.
+              </span>
+            ) : (
+              <button
+                className="upload-button"
+                onClick={handleManualUpload}
+                disabled={isExporting}
+              >
+                {isExporting
+                  ? 'Uploading…'
+                  : autoUploadStatus === 'error'
+                    ? 'Retry Upload'
+                    : 'Upload to Firebase Storage'}
+              </button>
+            )}
             <button className="secondary-button" onClick={handleTrainAgain}>
               Train Again
             </button>
