@@ -442,25 +442,50 @@ const ResultsPage = () => {
     const cellWidth = displayWidth / gridSize;
     const cellHeight = displayHeight / gridSize;
 
+    // UPDATED: 가시성을 높인 색상 함수 (파랑 -> 초록 -> 빨강 스펙트럼)
     const colorForIntensity = (value: number) => {
       const clamped = Math.min(1, Math.max(0, value));
-      const lightness = 35 + clamped * 15; // deep red at low intensity, brighter red as it increases
-      const alpha = 0.22 + clamped * 0.68;
-      return `hsla(0, 90%, ${lightness}%, ${alpha})`;
+      
+      // 1. Hue(색상) 계산: 
+      // 밀도가 낮을수록 240(파랑), 높을수록 0(빨강)에 가깝게 매핑
+      // (파랑 -> 하늘 -> 초록 -> 노랑 -> 주황 -> 빨강)
+      const hue = (1 - clamped) * 240;
+      
+      // 2. Lightness(밝기) 및 Saturation(채도):
+      // 선명한 색을 위해 채도는 100%, 밝기는 50% 유지
+      
+      // 3. Alpha(불투명도):
+      // 최소 0.5로 설정하여 희미한 점도 잘 보이게 하고, 밀도가 높으면 0.9까지 증가
+      const alpha = 0.5 + (clamped * 0.4);
+      
+      return `hsla(${hue}, 100%, 50%, ${alpha})`;
     };
 
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.filter = 'blur(12px) saturate(120%)';
+    
+    // UPDATED: 블렌딩 모드 변경
+    // 'lighter'는 색이 겹치면 흰색으로 변해 가시성이 떨어질 수 있으므로 
+    // 'source-over'를 사용하여 색상을 있는 그대로 진하게 표현합니다.
+    ctx.globalCompositeOperation = 'source-over';
+    
+    // UPDATED: 블러 효과 조정
+    // 너무 흐릿하지 않도록 블러 값을 약간 줄여(12px -> 8px) 분포 영역을 명확히 합니다.
+    ctx.filter = 'blur(6px)'; 
+    
     ctx.imageSmoothingEnabled = true;
 
     for (let y = 0; y < gridSize; y += 1) {
       for (let x = 0; x < gridSize; x += 1) {
         const count = grid[y * gridSize + x];
         if (count === 0) continue;
+        
+        // 로그 스케일 등을 적용하지 않고 선형 비율을 사용하여
+        // 데이터가 많은 곳(빨강)이 확실히 드러나도록 합니다.
         const intensity = count / maxCount;
+        
         ctx.fillStyle = colorForIntensity(intensity);
-        ctx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
+        // 블러 효과로 인한 빈틈을 줄이기 위해 cell 크기를 약간 키워(Overlap) 그립니다.
+        ctx.fillRect(x * cellWidth, y * cellHeight, cellWidth + 1, cellHeight + 1);
       }
     }
 
