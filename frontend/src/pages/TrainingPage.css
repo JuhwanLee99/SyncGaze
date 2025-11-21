@@ -155,10 +155,24 @@
 
 /* Controls */
 .training-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-auto-flow: dense;
   gap: 1rem;
-  justify-content: center;
-  flex-wrap: wrap;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  align-items: stretch;
+}
+
+.training-controls button {
+  width: 100%;
+}
+
+.training-controls .view-results-button {
+  grid-column: 1 / -1;
+  max-width: 420px;
+  justify-self: center;
 }
 
 .start-button,
@@ -277,7 +291,7 @@
   }
 
   .training-controls {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
   .start-button,
