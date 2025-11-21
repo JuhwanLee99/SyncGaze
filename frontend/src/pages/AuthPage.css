@@ -1,12 +1,13 @@
 /* src/pages/AuthPage.css */
 .auth-page {
   width: 100vw;
-  height: 100vh;
+  min-height: 100vh;
   background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow-y: auto;
+  padding: 2rem 0;
 }
 
 .auth-container {
@@ -14,7 +15,7 @@
   width: 90%;
   max-width: 1200px;
   height: 90vh;
-  max-height: 700px;
+  max-height: 900px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 20px;
   overflow: hidden;
@@ -91,7 +92,7 @@
 }
 
 .form-header {
-  margin-bottom: 2.5rem;
+  margin-bottom: 2rem;
   text-align: center;
 }
 
@@ -110,7 +111,7 @@
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .form-group {
@@ -166,15 +167,100 @@
   cursor: pointer;
 }
 
-.forgot-password {
+.forgot-password-button {
+  background: none;
+  border: none;
   color: #667eea;
   font-size: 0.9rem;
-  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
   transition: color 0.3s ease;
+  padding: 0;
 }
 
-.forgot-password:hover {
+.forgot-password-button:hover,
+.forgot-password-button:focus-visible {
   color: #764ba2;
+  text-decoration: underline;
+}
+
+.password-reset-area {
+  margin-top: 1.5rem;
+}
+
+.password-reset-form {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.password-reset-form label {
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.password-reset-form input {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.password-reset-form input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reset-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.reset-cancel-button,
+.reset-submit-button {
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+.reset-cancel-button {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.reset-submit-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+
+.reset-cancel-button:disabled,
+.reset-submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reset-feedback {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.reset-feedback.success {
+  color: #9be7a4;
+}
+
+.reset-feedback.error {
+  color: #ff9b9b;
 }
 
 .submit-button {
@@ -199,10 +285,114 @@
   transform: translateY(0);
 }
 
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.form-error {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: rgba(255, 87, 87, 0.15);
+  border: 1px solid rgba(255, 87, 87, 0.4);
+  color: #ff9b9b;
+  font-size: 0.9rem;
+}
+
+.social-error {
+  margin-top: 1rem;
+}
+/* 간격조절 */
+.oauth-divider { 
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #b8b8d1;
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+}
+
+.oauth-divider span {
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.google-button {
+  width: 100%;
+  margin-top: 0.2rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.google-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.google-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.guest-error {
+  margin-bottom: 1rem;
+}
+
+.guest-access {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.guest-button {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.guest-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.guest-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.guest-copy {
+  margin-top: 0.5rem;
+  margin-bottom: 0.2rem;
+  color: #b8b8d1;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
 .form-switch {
   text-align: center;
-  margin-top: 2rem;
-  padding-top: 2rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 

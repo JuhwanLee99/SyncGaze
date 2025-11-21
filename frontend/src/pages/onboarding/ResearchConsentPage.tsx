@@ -1,10 +1,12 @@
 import { ChangeEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './ResearchConsentPage.css';
-import { useTrackingSession } from '../../state/trackingSessionContext';
+import { useAuth } from '../../state/authContext';
+import { saveSurveyAndConsent, useTrackingSession } from '../../state/trackingSessionContext';
 
 const ResearchConsentPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { consentAccepted, setConsentAccepted } = useTrackingSession();
   const [agreements, setAgreements] = useState({
     webcam: consentAccepted,
@@ -13,6 +15,8 @@ const ResearchConsentPage = () => {
     privacy: consentAccepted,
   });
   const [error, setError] = useState<string | null>(null);
+  const [persistError, setPersistError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleToggle = (field: keyof typeof agreements) => (event: ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -22,21 +26,40 @@ const ResearchConsentPage = () => {
     }));
   };
 
-  const handleProceed = () => {
+  const handleProceed = async () => {
     const allChecked = Object.values(agreements).every(Boolean);
     if (!allChecked) {
       setError('모든 항목에 명시적으로 동의해야 다음 단계로 이동할 수 있습니다.');
       return;
     }
 
-    try {
-      sessionStorage.setItem('consentTimestamp', new Date().toISOString());
-    } catch (storageError) {
-      console.warn('Failed to persist consent timestamp:', storageError);
+    if (!user) {
+      setPersistError('로그인 정보를 확인할 수 없습니다. 다시 로그인한 뒤 진행해주세요.');
+      return;
     }
 
-    setConsentAccepted(true);
-    navigate('/calibration');
+    const consentTimestamp = new Date().toISOString();
+    setIsSaving(true);
+    setError(null);
+    setPersistError(null);
+
+    try {
+      await saveSurveyAndConsent({ uid: user.uid, consentTimestamp });
+
+      try {
+        sessionStorage.setItem('consentTimestamp', consentTimestamp);
+      } catch (storageError) {
+        console.warn('Failed to persist consent timestamp:', storageError);
+      }
+
+      setConsentAccepted(true);
+      navigate('/calibration');
+    } catch (consentError) {
+      console.error('Failed to save consent to Firestore', consentError);
+      setPersistError('동의 내용을 저장하지 못했습니다. 네트워크 상태를 확인 후 다시 시도해주세요.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -84,11 +107,25 @@ const ResearchConsentPage = () => {
           </label>
         </section>
 
-        {error && <div className="error-banner">{error}</div>}
+        {(error || persistError) && (
+          <div className="error-banner" role="alert">
+            <div>{error ?? persistError}</div>
+            {persistError && (
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={handleProceed}
+                disabled={isSaving}
+              >
+                {isSaving ? '동의 재저장 중...' : '동의 정보 다시 저장하기'}
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="consent-actions">
-          <button className="primary-button" type="button" onClick={handleProceed}>
-            연구에 동의하고 캘리브레이션으로 이동
+          <button className="primary-button" type="button" onClick={handleProceed} disabled={isSaving}>
+            {isSaving ? '동의 내용 저장 중...' : '연구에 동의하고 캘리브레이션으로 이동'}
           </button>
           <button className="secondary-button" type="button" onClick={() => navigate('/onboarding/survey')}>
             설문 수정하기
