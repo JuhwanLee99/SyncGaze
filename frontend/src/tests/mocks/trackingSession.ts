@@ -47,6 +47,7 @@ export const buildCalibrationResult = (
 ): CalibrationResult => ({
   status: 'validated',
   validationError: 2,
+  validationStdDev: 1.5,
   completedAt: new Date().toISOString(),
   ...overrides,
 });
@@ -64,6 +65,7 @@ export const buildTrainingSession = (
   avgReactionTime: 250,
   gazeAccuracy: 75,
   mouseAccuracy: 90,
+  screenSize: { width: 1920, height: 1080 },
   csvData: 'timestamp,gazeX',
   rawData: [],
   ...overrides,

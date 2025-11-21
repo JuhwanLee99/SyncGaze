@@ -19,6 +19,7 @@ export type CalibrationStatus = 'not-started' | 'in-progress' | 'validated' | 's
 export interface CalibrationResult {
   status: CalibrationStatus;
   validationError: number | null;
+  validationStdDev?: number | null;
   completedAt?: string;
 }
 export interface TrainingDataPoint {
@@ -44,6 +45,7 @@ export interface TrainingSessionSummary {
   avgReactionTime: number;
   gazeAccuracy: number;
   mouseAccuracy: number;
+  screenSize?: { width: number; height: number } | null;
   csvData: string;
   rawData: TrainingDataPoint[];
 }

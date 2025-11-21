@@ -113,6 +113,7 @@ const ResultsPage = () => {
             consentAccepted,
             calibrationResult,
             participantLabel,
+            screenSize: sessionData.screenSize,
           },
           {
             filename: `training-session-${sessionData.id}.csv`,
