@@ -27,7 +27,7 @@ const LandingPage = () => {
       <header className="hero">
         <nav className="navbar">
           <div className="logo">SyncGaze</div>
-          <button className="nav-button" onClick={() => navigate('/auth')}>
+          <button className="nav-button cursor-target" onClick={() => navigate('/auth')}>
             Sign In
           </button>
         </nav>
@@ -54,7 +54,7 @@ const LandingPage = () => {
       <section id="features" className="features">
         <h2>Why Choose SyncGaze?</h2>
         <div className="feature-grid">
-          <div className="feature-card">
+          <div className="feature-card cursor-target">
           
             <h3>Eye Tracking Technology</h3>
             <p>Advanced WebGazer integration for precise gaze tracking and analysis</p>
