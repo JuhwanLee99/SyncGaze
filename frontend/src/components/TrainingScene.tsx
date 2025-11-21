@@ -82,7 +82,7 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
   
   // Physics state
   const [velocity, setVelocity] = useState(new THREE.Vector3());
-  const [playerPosition, setPlayerPosition] = useState(new THREE.Vector3());
+  const [playerPosition, setPlayerPosition] = useState(new THREE.Vector3(0, 1.6, -10));
   const physicsRef = useRef(new CS2Physics());
   const cameraRotationRef = useRef(new THREE.Euler());
   
@@ -397,13 +397,14 @@ export const TrainingScene: React.FC<TrainingSceneProps> = ({ onComplete }) => {
       <Crosshair />
 
       <Canvas>
-        <PerspectiveCamera makeDefault position={[0, 1.6, 0]} fov={90} />
+        <PerspectiveCamera makeDefault position={[0, 1.6, -8]}rotation={[0, Math.PI, 0]}  fov={90} />
         <CameraRotationTracker />
         <TargetTracker /> 
         <ShootingController />
         
         <CameraController
           isActive={isLocked}
+          initialPosition={new THREE.Vector3(0, 1.6, -8)} // Add this
           onPhysicsUpdate={handlePhysicsUpdate}
         />
         
