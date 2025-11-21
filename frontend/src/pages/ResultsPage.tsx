@@ -12,6 +12,7 @@ import {
 import { exportSessionData } from '../utils/sessionExport';
 import { useWebgazer } from '../hooks/tracking/useWebgazer';  // NEW: Import useWebgazer
 import { useAuth } from '../state/authContext';
+import { persistLatestSession } from '../utils/resultsStorage';
 
 interface Analytics {
   totalTargets: number;
@@ -130,6 +131,13 @@ const ResultsPage = () => {
     };
   };
 
+  useEffect(() => {
+    if (!sessionData) {
+      return;
+    }
+    persistLatestSession(sessionData, calibrationResult);
+  }, [sessionData, calibrationResult]);
+
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type });
     if (toastTimeoutRef.current) {
@@ -241,6 +249,13 @@ const ResultsPage = () => {
     persistUploadStatus(sessionData?.id, status);
   }, [handleExport, sessionData?.id]);
 
+  const handleOpenDetailed = (focusMetric?: string) => {
+    if (sessionData) {
+      persistLatestSession(sessionData, calibrationResult);
+    }
+    navigate('/results/detailed', { state: { focusMetric, sessionId: sessionData?.id } });
+  };
+
   if (!sessionData || !analytics) {
     return (
       <div className="results-page">
@@ -269,15 +284,23 @@ const ResultsPage = () => {
         <section className="metrics-section">
           <h2>Performance Overview</h2>
           <div className="metrics-grid">
-            <div className="metric-card highlight">
+            <button
+              type="button"
+              className="metric-card actionable highlight"
+              onClick={() => handleOpenDetailed('accuracy')}
+            >
               <div className="metric-icon">🎯</div>
               <div className="metric-content">
                 <div className="metric-value">{analytics.accuracy.toFixed(1)}%</div>
                 <div className="metric-label">Accuracy</div>
               </div>
-            </div>
+            </button>
 
-            <div className="metric-card">
+            <button
+              type="button"
+              className="metric-card actionable"
+              onClick={() => handleOpenDetailed('targets')}
+            >
               <div className="metric-icon">✓</div>
               <div className="metric-content">
                 <div className="metric-value">
@@ -285,9 +308,13 @@ const ResultsPage = () => {
                 </div>
                 <div className="metric-label">Targets Hit</div>
               </div>
-            </div>
+            </button>
 
-            <div className="metric-card">
+            <button
+              type="button"
+              className="metric-card actionable"
+              onClick={() => handleOpenDetailed('reaction')}
+            >
               <div className="metric-icon">⚡</div>
               <div className="metric-content">
                 <div className="metric-value">
@@ -295,23 +322,31 @@ const ResultsPage = () => {
                 </div>
                 <div className="metric-label">Avg Reaction Time</div>
               </div>
-            </div>
+            </button>
 
-            <div className="metric-card">
+            <button
+              type="button"
+              className="metric-card actionable"
+              onClick={() => handleOpenDetailed('gaze')}
+            >
               <div className="metric-icon">👁️</div>
               <div className="metric-content">
                 <div className="metric-value">{analytics.gazeAccuracy.toFixed(1)}%</div>
                 <div className="metric-label">Gaze Accuracy</div>
               </div>
-            </div>
+            </button>
 
-            <div className="metric-card">
+            <button
+              type="button"
+              className="metric-card actionable"
+              onClick={() => handleOpenDetailed('mouse')}
+            >
               <div className="metric-icon">🖱️</div>
               <div className="metric-content">
                 <div className="metric-value">{analytics.mouseAccuracy.toFixed(1)}%</div>
                 <div className="metric-label">Mouse Accuracy</div>
               </div>
-            </div>
+            </button>
           </div>
         </section>
 
