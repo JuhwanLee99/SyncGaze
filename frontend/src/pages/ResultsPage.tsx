@@ -1,5 +1,5 @@
 // frontend/src/pages/ResultsPage.tsx
-// UPDATED: Stops WebGazer when mounting results page
+// UPDATED: Stops WebGazer when mounting results page, Improved Heatmap Colors & Legend
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -10,9 +10,10 @@ import {
   useTrackingSession,
 } from '../state/trackingSessionContext';
 import { exportSessionData } from '../utils/sessionExport';
-import { useWebgazer } from '../hooks/tracking/useWebgazer';  // NEW: Import useWebgazer
+import { useWebgazer } from '../hooks/tracking/useWebgazer';
 import { useAuth } from '../state/authContext';
 import { persistLatestSession } from '../utils/resultsStorage';
+import { calculatePerformanceAnalytics, PerformanceAnalytics } from '../utils/analytics';
 
 interface Analytics {
   totalTargets: number;
@@ -22,7 +23,6 @@ interface Analytics {
   gazeAccuracy: number;
   mouseAccuracy: number;
 }
-import { calculatePerformanceAnalytics, PerformanceAnalytics } from '../utils/analytics';
 
 type AutoUploadStatus = 'idle' | 'success' | 'error' | 'skipped';
 
@@ -279,7 +279,6 @@ const ResultsPage = () => {
     calibrationResult,
   } = useTrackingSession();
   
-  // NEW: Get stopSession from WebGazer context
   const { stopSession } = useWebgazer();
   
   const { user } = useAuth();
@@ -385,8 +384,6 @@ const ResultsPage = () => {
         x: (point.gazeX ?? 0) / baseScreenWidth,
         y: (point.gazeY ?? 0) / baseScreenHeight,
       }))
-      // Keep only points that fall inside the normalized viewport so the
-      // heatmap doesn't blur everything into the background.
       .filter(point => point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1);
 
     return { heatmapPoints, baseScreenWidth, baseScreenHeight };
@@ -420,7 +417,6 @@ const ResultsPage = () => {
       return;
     }
 
-    // Build a simple density grid so hotter areas pop visually.
     const gridSize = 64;
     const grid = new Float32Array(gridSize * gridSize);
     let maxCount = 0;
@@ -442,49 +438,26 @@ const ResultsPage = () => {
     const cellWidth = displayWidth / gridSize;
     const cellHeight = displayHeight / gridSize;
 
-    // UPDATED: 가시성을 높인 색상 함수 (파랑 -> 초록 -> 빨강 스펙트럼)
+    // UPDATED: Spectrum color function (Blue -> Green -> Red)
     const colorForIntensity = (value: number) => {
       const clamped = Math.min(1, Math.max(0, value));
-      
-      // 1. Hue(색상) 계산: 
-      // 밀도가 낮을수록 240(파랑), 높을수록 0(빨강)에 가깝게 매핑
-      // (파랑 -> 하늘 -> 초록 -> 노랑 -> 주황 -> 빨강)
+      // Map intensity to hue: 0.0 -> 240 (Blue), 1.0 -> 0 (Red)
       const hue = (1 - clamped) * 240;
-      
-      // 2. Lightness(밝기) 및 Saturation(채도):
-      // 선명한 색을 위해 채도는 100%, 밝기는 50% 유지
-      
-      // 3. Alpha(불투명도):
-      // 최소 0.5로 설정하여 희미한 점도 잘 보이게 하고, 밀도가 높으면 0.9까지 증가
-      const alpha = 0.5 + (clamped * 0.4);
-      
+      const alpha = 0.5 + (clamped * 0.4); // Increase alpha with intensity
       return `hsla(${hue}, 100%, 50%, ${alpha})`;
     };
 
     ctx.save();
-    
-    // UPDATED: 블렌딩 모드 변경
-    // 'lighter'는 색이 겹치면 흰색으로 변해 가시성이 떨어질 수 있으므로 
-    // 'source-over'를 사용하여 색상을 있는 그대로 진하게 표현합니다.
-    ctx.globalCompositeOperation = 'source-over';
-    
-    // UPDATED: 블러 효과 조정
-    // 너무 흐릿하지 않도록 블러 값을 약간 줄여(12px -> 8px) 분포 영역을 명확히 합니다.
-    ctx.filter = 'blur(6px)'; 
-    
+    ctx.globalCompositeOperation = 'source-over'; // Changed from lighter for better visibility
+    ctx.filter = 'blur(3px)'; // Reduced blur for clarity
     ctx.imageSmoothingEnabled = true;
 
     for (let y = 0; y < gridSize; y += 1) {
       for (let x = 0; x < gridSize; x += 1) {
         const count = grid[y * gridSize + x];
         if (count === 0) continue;
-        
-        // 로그 스케일 등을 적용하지 않고 선형 비율을 사용하여
-        // 데이터가 많은 곳(빨강)이 확실히 드러나도록 합니다.
         const intensity = count / maxCount;
-        
         ctx.fillStyle = colorForIntensity(intensity);
-        // 블러 효과로 인한 빈틈을 줄이기 위해 cell 크기를 약간 키워(Overlap) 그립니다.
         ctx.fillRect(x * cellWidth, y * cellHeight, cellWidth + 1, cellHeight + 1);
       }
     }
@@ -500,7 +473,6 @@ const ResultsPage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, [drawHeatmap, baseScreenWidth, baseScreenHeight]);
 
-  // NEW: Stop WebGazer when results page mounts
   useEffect(() => {
     console.log('📊 Results page mounted - stopping WebGazer');
     stopSession();
@@ -516,44 +488,6 @@ const ResultsPage = () => {
     setAutoUploadAttemptedFor(null);
     setAutoUploadStatus(loadStoredUploadStatus(activeSession.id) ?? 'idle');
   }, [activeSession, navigate]);
-
-  const calculateAnalytics = (data: TrainingDataPoint[]): Analytics => {
-    if (data.length === 0) {
-      return {
-        totalTargets: 0,
-        targetsHit: 0,
-        accuracy: 0,
-        avgReactionTime: 0,
-        gazeAccuracy: 0,
-        mouseAccuracy: 0,
-      };
-    }
-
-    const hits = data.filter(d => d.targetHit);
-    const totalTargets = data.filter(d => d.targetId !== null).length || hits.length;
-    const targetsHit = hits.length;
-
-    const reactionTimes = hits.map(d => d.timestamp);
-    const avgReactionTime = reactionTimes.length > 0
-      ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length
-      : 0;
-
-    const dataWithGaze = data.filter(d => d.gazeX !== null && d.gazeY !== null);
-    const dataWithMouse = data.filter(d => d.mouseX !== null && d.mouseY !== null);
-
-    const gazeAccuracy = (dataWithGaze.length / data.length) * 100;
-    const mouseAccuracy = (dataWithMouse.length / data.length) * 100;
-    const accuracy = totalTargets > 0 ? (targetsHit / totalTargets) * 100 : 0;
-
-    return {
-      totalTargets,
-      targetsHit,
-      accuracy,
-      avgReactionTime,
-      gazeAccuracy,
-      mouseAccuracy,
-    };
-  };
 
   useEffect(() => {
     if (!sessionData) {
@@ -803,6 +737,30 @@ const ResultsPage = () => {
                 ) : (
                   <div className="chart-empty">No gaze samples collected for this session.</div>
                 )}
+                
+                {/* UPDATED: Heatmap Legend Added */}
+                {heatmapPoints.length > 0 && (
+                  <div className="heatmap-legend" style={{ marginTop: '0px', padding: '0 8px' }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      fontSize: '0.75rem', 
+                      color: '#666', 
+                      marginBottom: '4px',
+                      fontWeight: 500
+                    }}>
+                      <span>Low Focus</span>
+                      <span>High Focus</span>
+                    </div>
+                    <div style={{
+                      height: '6px',
+                      width: '100%',
+                      background: 'linear-gradient(to right, hsla(240, 100%, 50%, 0.5), hsla(180, 100%, 50%, 0.6), hsla(120, 100%, 50%, 0.7), hsla(60, 100%, 50%, 0.8), hsla(0, 100%, 50%, 0.9))',
+                      borderRadius: '4px'
+                    }} aria-label="Heatmap density legend from blue (low) to red (high)"></div>
+                  </div>
+                )}
+
                 <div className="heatmap-footer">
                   <p className="viz-description">
                     Visualize where your gaze was focused during the session
