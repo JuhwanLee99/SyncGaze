@@ -175,6 +175,38 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
     };
   }, []);
 
+  // Auto-despawn targets after 3 seconds if not hit
+  useEffect(() => {
+    if (!isLocked) return;
+
+    const checkInterval = setInterval(() => {
+      const now = performance.now();
+      
+      setTargets(prev => {
+        let needsReplacement = false;
+        const updatedTargets = prev.filter(target => {
+          const timeAlive = now - target.spawnTime;
+          if (timeAlive > 1800) { // 3 seconds
+            console.log('⏱️ Target timed out:', target.id);
+            needsReplacement = true;
+            return false; // Remove this target
+          }
+          return true;
+        });
+
+        // Spawn new target if one timed out
+        if (needsReplacement) {
+          const elapsedTime = now - startTimeRef.current - totalPausedDurationRef.current;
+          return [...updatedTargets, spawnTarget(elapsedTime)];
+        }
+
+        return updatedTargets;
+      });
+    }, 100); // Check every 100ms
+
+    return () => clearInterval(checkInterval);
+  }, [isLocked, spawnTarget]);
+
   const handleTargetHit = useCallback((targetId: string) => {
     console.log('💥 Target hit:', targetId);
     
