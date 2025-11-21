@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './ResultsPage.css';
 import {
-  TrainingDataPoint,
   TrainingSessionSummary,
   useTrackingSession,
 } from '../state/trackingSessionContext';
@@ -22,6 +21,7 @@ interface Analytics {
   gazeAccuracy: number;
   mouseAccuracy: number;
 }
+import { calculatePerformanceAnalytics, PerformanceAnalytics } from '../utils/analytics';
 
 type AutoUploadStatus = 'idle' | 'success' | 'error' | 'skipped';
 
@@ -67,7 +67,7 @@ const ResultsPage = () => {
   
   const { user } = useAuth();
   const [sessionData, setSessionData] = useState<TrainingSessionSummary | null>(activeSession);
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [analytics, setAnalytics] = useState<PerformanceAnalytics | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [autoUploadAttemptedFor, setAutoUploadAttemptedFor] = useState<string | null>(null);
   const [autoUploadStatus, setAutoUploadStatus] = useState<AutoUploadStatus>('idle');
@@ -88,7 +88,7 @@ const ResultsPage = () => {
       return;
     }
     setSessionData(activeSession);
-    setAnalytics(calculateAnalytics(activeSession.rawData));
+    setAnalytics(calculatePerformanceAnalytics(activeSession.rawData));
     setAutoUploadAttemptedFor(null);
     setAutoUploadStatus(loadStoredUploadStatus(activeSession.id) ?? 'idle');
   }, [activeSession, navigate]);
@@ -168,6 +168,7 @@ const ResultsPage = () => {
             consentAccepted,
             calibrationResult,
             participantLabel,
+            screenSize: sessionData.screenSize,
           },
           {
             filename: `training-session-${sessionData.id}.csv`,

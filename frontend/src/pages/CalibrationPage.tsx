@@ -43,6 +43,7 @@ const CalibrationPage = () => {
       saveCalibrationResult({
         status: 'validated',
         validationError,
+        validationStdDev: gazeStability,
         completedAt: new Date().toISOString(),
       });
     }
@@ -50,6 +51,7 @@ const CalibrationPage = () => {
     isValidationSuccessful,
     validationSequence,
     validationError,
+    gazeStability,
     saveCalibrationResult,
   ]);
 

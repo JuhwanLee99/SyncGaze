@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHand
 import * as THREE from 'three';
 import { Target } from './Target';
 import { useMouseLook } from '../hooks/useMouseLook';
+import { useFrame } from '@react-three/fiber';
 import type { Target3D } from '../types';
 
 interface GameControllerProps {
@@ -29,12 +30,34 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
   const hasInitialized = useRef<boolean>(false);
   const gameLoopRef = useRef<number | null>(null);
 
+  const pausedTimeRef = useRef<number>(0);
+  const totalPausedDurationRef = useRef<number>(0);
+  const wasLockedRef = useRef<boolean>(false);
+
+  
   const { getMouseData, clearMouseData } = useMouseLook(0.002, isLocked);
+
+  // ADD THIS ENTIRE useEffect:
+  useEffect(() => {
+    if (isLocked && !wasLockedRef.current && pausedTimeRef.current > 0) {
+      // Just resumed
+      const pauseDuration = performance.now() - pausedTimeRef.current;
+      totalPausedDurationRef.current += pauseDuration;
+      pausedTimeRef.current = 0;
+      console.log('▶️ GameController resumed, paused for:', pauseDuration, 'ms');
+    } else if (!isLocked && wasLockedRef.current) {
+      // Just paused
+      pausedTimeRef.current = performance.now();
+      console.log('⏸️ GameController paused');
+    }
+    wasLockedRef.current = isLocked;
+  }, [isLocked]);
+
 
   const spawnTarget = useCallback((elapsedTime: number): Target3D => {
     // First 30 seconds: static targets only
     // 30-60 seconds: moving targets only
-    const phaseType = elapsedTime < 30000 ? 'static' : 'moving';
+    const phaseType = elapsedTime < 20000 ? 'static' : 'moving';
     const isMoving = phaseType === 'moving';
 
     const theta = Math.random() * Math.PI * 2;
@@ -54,12 +77,66 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
       spawnTime: performance.now(),
       type: isMoving ? 'moving' : 'static',
       velocity: isMoving ? new THREE.Vector3(
-        (Math.random() - 0.5) * 0.03,
-        (Math.random() - 0.5) * 0.03,
-        (Math.random() - 0.5) * 0.03
+        (Math.random() - 0.5) * 0.24,
+        (Math.random() - 0.5) * 0.24,
+        (Math.random() - 0.5) * 0.24
       ) : undefined
     };
   }, []);
+
+  useFrame(() => {
+    if (!isLocked) return;
+
+    setTargets(prev => prev.map(target => {
+      if (target.type !== 'moving' || !target.velocity) return target;
+
+      const newPosition = target.position.clone();
+      const newVelocity = target.velocity.clone();
+
+      // Room boundaries
+      const bounds = {
+        minX: -4.7,
+        maxX: 4.7,
+        minY: 0.8,
+        maxY: 9.7,
+        minZ: -4.7,
+        maxZ: 4.7
+      };
+
+      // Predict next position
+      const nextPosition = target.position.clone().add(target.velocity);
+
+      // X boundaries
+      if (nextPosition.x < bounds.minX || nextPosition.x > bounds.maxX) {
+        newVelocity.x *= -1;
+        newPosition.x = THREE.MathUtils.clamp(target.position.x, bounds.minX, bounds.maxX);
+      } else {
+        newPosition.x = nextPosition.x;
+      }
+
+      // Y boundaries
+      if (nextPosition.y < bounds.minY || nextPosition.y > bounds.maxY) {
+        newVelocity.y *= -1;
+        newPosition.y = THREE.MathUtils.clamp(target.position.y, bounds.minY, bounds.maxY);
+      } else {
+        newPosition.y = nextPosition.y;
+      }
+
+      // Z boundaries
+      if (nextPosition.z < bounds.minZ || nextPosition.z > bounds.maxZ) {
+        newVelocity.z *= -1;
+        newPosition.z = THREE.MathUtils.clamp(target.position.z, bounds.minZ, bounds.maxZ);
+      } else {
+        newPosition.z = nextPosition.z;
+      }
+
+      return {
+        ...target,
+        position: newPosition,
+        velocity: newVelocity
+      };
+    }));
+  });
 
   // Initialize game once when locked first time
   useEffect(() => {
@@ -71,7 +148,8 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
     setTargets([spawnTarget(0)]);
 
     gameLoopRef.current = setInterval(() => {
-      const elapsedTime = performance.now() - startTimeRef.current;
+      if (!isLocked) return;
+      const elapsedTime = performance.now() - startTimeRef.current - totalPausedDurationRef.current;
 
       if (elapsedTime > 60000) {
         console.log('⏰ 60 seconds completed');
@@ -96,6 +174,38 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
       }
     };
   }, []);
+
+  // Auto-despawn targets after 3 seconds if not hit
+  useEffect(() => {
+    if (!isLocked) return;
+
+    const checkInterval = setInterval(() => {
+      const now = performance.now();
+      
+      setTargets(prev => {
+        let needsReplacement = false;
+        const updatedTargets = prev.filter(target => {
+          const timeAlive = now - target.spawnTime;
+          if (timeAlive > 1800) { // 3 seconds
+            console.log('⏱️ Target timed out:', target.id);
+            needsReplacement = true;
+            return false; // Remove this target
+          }
+          return true;
+        });
+
+        // Spawn new target if one timed out
+        if (needsReplacement) {
+          const elapsedTime = now - startTimeRef.current - totalPausedDurationRef.current;
+          return [...updatedTargets, spawnTarget(elapsedTime)];
+        }
+
+        return updatedTargets;
+      });
+    }, 100); // Check every 100ms
+
+    return () => clearInterval(checkInterval);
+  }, [isLocked, spawnTarget]);
 
   const handleTargetHit = useCallback((targetId: string) => {
     console.log('💥 Target hit:', targetId);
