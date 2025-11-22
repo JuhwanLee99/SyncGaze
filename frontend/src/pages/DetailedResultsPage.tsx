@@ -10,7 +10,8 @@ import {
 import { loadStoredCalibration, loadStoredSession, persistLatestSession } from '../utils/resultsStorage';
 import { calculatePerformanceAnalytics, generateErrorTimeSeries } from '../utils/analytics';
 
-type FocusMetric = 'accuracy' | 'targets' | 'reaction' | 'gaze' | 'mouse';
+// UPDATED: Added 'trends' and 'heatmap' to focus metrics
+type FocusMetric = 'accuracy' | 'targets' | 'reaction' | 'gaze' | 'mouse' | 'trends' | 'heatmap';
 
 interface ErrorStats {
   avg: number;
@@ -503,8 +504,8 @@ const DetailedResultsPage = () => {
         
         <div className="viz-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
           
-          {/* Performance Chart with Filter Controls */}
-          <div className="viz-card detail-card bordered" style={{ padding: '20px' }}>
+          {/* Performance Chart with Filter Controls (UPDATED: Added conditional class for 'trends' focus) */}
+          <div className={`viz-card detail-card bordered ${focusMetric === 'trends' ? 'focused' : ''}`} style={{ padding: '20px' }}>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px'}}>
               <h3>Performance Trends</h3>
               
@@ -556,8 +557,8 @@ const DetailedResultsPage = () => {
             </div>
           </div>
 
-          {/* Heatmap */}
-          <div className="viz-card detail-card bordered" style={{ padding: '20px' }}>
+          {/* Heatmap (UPDATED: Added conditional class for 'heatmap' focus) */}
+          <div className={`viz-card detail-card bordered ${focusMetric === 'heatmap' ? 'focused' : ''}`} style={{ padding: '20px' }}>
              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
               <h3>Gaze Heatmap</h3>
               <ZoomControls 

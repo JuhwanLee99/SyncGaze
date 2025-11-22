@@ -751,8 +751,12 @@ const ResultsPage = () => {
         <section className="viz-section">
           <h2>Session Visualizations</h2>
           <div className="viz-grid">
-            {/* Performance Trends Chart (UPDATED) */}
-            <div className="viz-card">
+            {/* Performance Trends Chart (UPDATED: Clickable) */}
+            <div 
+              className="viz-card actionable" 
+              onClick={() => handleOpenDetailed('trends')}
+              style={{ cursor: 'pointer' }}
+            >
               <h3>Performance Trends (Error & Sync)</h3>
               <PerformanceLineChart 
                 series={performanceSeries} 
@@ -761,8 +765,12 @@ const ResultsPage = () => {
               />
             </div>
 
-            {/* Gaze Heatmap */}
-            <div className="viz-card">
+            {/* Gaze Heatmap (UPDATED: Clickable) */}
+            <div 
+              className="viz-card actionable"
+              onClick={() => handleOpenDetailed('heatmap')}
+              style={{ cursor: 'pointer' }}
+            >
               <h3>Gaze Heatmap</h3>
               <div className="heatmap-wrapper">
                 {heatmapPoints.length ? (
