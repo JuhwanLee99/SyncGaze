@@ -4,10 +4,29 @@ import { useRef } from 'react';
 import './LandingPage.css';
 import DarkVeilBackground from '../components/DarkVeil';
 import Crosshair from '../components/ScreenCrosshair';
+import { useAuth } from '../state/authContext';
 
 const LandingPage = () => {
   const navigate = useNavigate();
   const ctaSectionRef = useRef<HTMLElement>(null);
+  const { user, signOut } = useAuth();
+
+  const handleNavClick = async () => {
+    if (user) {
+      await signOut();
+      navigate('/');
+      return;
+    }
+    navigate('/auth');
+  };
+
+  const handlePrimaryCta = () => {
+    if (user) {
+      navigate('/dashboard');
+    } else {
+      navigate('/auth');
+    }
+  };
 
   return (
     <div className="landing-page">
@@ -27,8 +46,8 @@ const LandingPage = () => {
       <header className="hero">
         <nav className="navbar">
           <div className="logo">SyncGaze</div>
-          <button className="nav-button" onClick={() => navigate('/auth')}>
-            Sign In
+          <button className="nav-button" onClick={handleNavClick}>
+            {user ? 'Sign Out' : 'Sign In'}
           </button>
         </nav>
         
@@ -38,8 +57,8 @@ const LandingPage = () => {
             Analyze your gaze patterns, improve reaction time, and unlock peak performance
           </p>
           <div className="cta-buttons">
-            <button className="primary-button" onClick={() => navigate('/auth')}>
-              Get Started
+            <button className="primary-button" onClick={handlePrimaryCta}>
+              {user ? 'Go to Dashboard' : 'Get Started'}
             </button>
             <button className="secondary-button" onClick={() => {
               document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
@@ -115,8 +134,8 @@ const LandingPage = () => {
         <Crosshair containerRef={ctaSectionRef} color='#ffffff'  circleRadius={50}/>
         <h2>Ready to Level Up Your Aim?</h2>
         <p>Join thousands of users improving their performance</p>
-        <button className="primary-button large" onClick={() => navigate('/auth')}>
-          Start Training Now
+        <button className="primary-button large" onClick={handlePrimaryCta}>
+          {user ? 'Go to Dashboard' : 'Start Training Now'}
         </button>
       </section>
 
