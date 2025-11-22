@@ -1,23 +1,25 @@
 // src/pages/DashboardPage.tsx
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './DashboardPage.css';
 import { useTrackingSession, TrainingSessionSummary } from '../state/trackingSessionContext';
+import { useAuth } from '../state/authContext';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const { recentSessions, setActiveSessionId, calibrationResult } = useTrackingSession();
-  const [userEmail, setUserEmail] = useState('');
+  const { recentSessions, setActiveSessionId, calibrationResult, resetState, isAnonymousSession } = useTrackingSession();
+  const { user, signOut: signOutUser } = useAuth();
+  const hasRealSession = recentSessions.some(session => !session.id.startsWith('mock-'));
+  const isNewUser = isAnonymousSession || !hasRealSession;
 
-  useEffect(() => {
-    const email = localStorage.getItem('userEmail') || 'user@example.com';
-    setUserEmail(email);
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userEmail');
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await signOutUser();
+      resetState();
+      navigate('/');
+    } catch (error) {
+      console.error('Failed to log out', error);
+    }
   };
 
   const handleStartTraining = () => {
@@ -26,7 +28,7 @@ const DashboardPage = () => {
 
   const handleViewResults = (sessionId: string) => {
     setActiveSessionId(sessionId);
-    navigate('/results');
+    navigate('/results', { state: { sessionId } });
   };
 
   const stats = useMemo(() => {
@@ -48,7 +50,7 @@ const DashboardPage = () => {
       totalSessions,
       avgAccuracy: Number(avgAccuracy.toFixed(1)),
       bestAccuracy: Number(bestAccuracy.toFixed(1)),
-      avgReactionTime: Number(avgReactionTime.toFixed(0)),
+      avgReactionTime: Number(avgReactionTime.toFixed(2)),
     };
   }, [recentSessions]);
 
@@ -68,6 +70,9 @@ const DashboardPage = () => {
     return 'Calibration pending.';
   }, [calibrationResult]);
 
+  // ✅ NEW: Conditional welcome message based on session history
+  const isFirstTime = recentSessions.length === 0;
+
   return (
     <div className="dashboard-page">
       {/* Header */}
@@ -82,7 +87,7 @@ const DashboardPage = () => {
           </button>
           <div className="header-actions">
             <div className="calibration-status">{calibrationMessage}</div>
-            <span className="user-email">{userEmail}</span>
+            <span className="user-email">{user?.displayName || user?.email || 'Account'}</span>
             <button className="logout-button" onClick={handleLogout}>
               Logout
             </button>
@@ -92,10 +97,14 @@ const DashboardPage = () => {
 
       {/* Main Content */}
       <main className="dashboard-main">
-        {/* Welcome Section */}
+        {/* Welcome Section - ✅ NOW CONDITIONAL */}
         <section className="welcome-section">
-          <h2>Welcome back!</h2>
-          <p>Track your progress and start a new training session</p>
+          <h2>{isFirstTime ? 'Welcome to SyncGaze!' : 'Welcome back!'}</h2>
+          <p>
+            {isFirstTime 
+              ? 'Start your first training session to track your eye-tracking performance' 
+              : 'Track your progress and start a new training session'}
+          </p>
         </section>
 
         {/* Quick Stats */}
@@ -155,39 +164,44 @@ const DashboardPage = () => {
             </div>
           ) : (
             <div className="sessions-table">
-              <div className="table-header">
-                <div className="table-cell">Date</div>
-                <div className="table-cell">Duration</div>
-                <div className="table-cell">Accuracy</div>
-                <div className="table-cell">Targets Hit</div>
-                <div className="table-cell">Avg Reaction</div>
-                <div className="table-cell">Actions</div>
-              </div>
-
-              {recentSessions.map((session: TrainingSessionSummary) => (
-                <div key={session.id} className="table-row">
-                  <div className="table-cell">
-                    {new Date(session.date).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </div>
-                  <div className="table-cell">{session.duration}s</div>
-                  <div className="table-cell">
-                    <span className="accuracy-badge">{session.accuracy.toFixed(1)}%</span>
-                  </div>
-                  <div className="table-cell">
-                    {session.targetsHit}/{session.totalTargets}
-                  </div>
-                  <div className="table-cell">{session.avgReactionTime}ms</div>
-                  <div className="table-cell">
-                    <button className="view-button" onClick={() => handleViewResults(session.id)}>
-                      View Details
-                    </button>
-                  </div>
-                </div>
-              ))}
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">Duration</th>
+                    <th scope="col">Accuracy</th>
+                    <th scope="col">Targets Hit</th>
+                    <th scope="col">Avg Reaction</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentSessions.map((session: TrainingSessionSummary) => (
+                    <tr key={session.id}>
+                      <td>
+                        {new Date(session.date).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </td>
+                      <td>{session.duration}s</td>
+                      <td>
+                        <span className="accuracy-badge">{session.accuracy.toFixed(1)}%</span>
+                      </td>
+                      <td>
+                        {session.targetsHit}/{session.totalTargets}
+                      </td>
+                      <td>{session.avgReactionTime.toFixed(2)}ms</td>
+                      <td className="table-actions">
+                        <button className="view-button" onClick={() => handleViewResults(session.id)}>
+                          View Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>

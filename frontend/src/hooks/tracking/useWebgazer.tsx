@@ -1,11 +1,11 @@
+// frontend/src/hooks/tracking/useWebgazer.tsx
+// UPDATED: Added stopSession() and pauseSession() methods for proper cleanup
+
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { FORBIDDEN_ZONE, TOTAL_TASKS, RECALIBRATION_THRESHOLD } from '../../features/tracker/calibration/constants';
+import { RECALIBRATION_THRESHOLD } from '../../features/tracker/calibration/constants';
 import {
-  DataRecord,
-  DotPosition,
   GameState,
   LiveGaze,
-  TaskResult,
   QualitySetting,
 } from '../../features/tracker/calibration/types';
 
@@ -16,21 +16,18 @@ interface WebgazerContextValue {
   validationError: number | null;
   gazeStability: number | null;
   calStage3SuccessRate: number | null;
-  currentDot: DotPosition | null;
-  taskCount: number;
-  taskResults: TaskResult[];
   isValidationSuccessful: boolean;
   validationSequence: number;
   quality: QualitySetting;
   isFaceDetected: boolean;
   startSession: () => void;
+  stopSession: () => void;  // NEW: Stop WebGazer completely
+  pauseSession: () => void; // NEW: Pause WebGazer (can be resumed)
   setQuality: (quality: QualitySetting) => void;
   handleCalibrationComplete: () => void;
   handleWebcamCheckComplete: () => void;
   startValidation: () => void;
-  startTaskPhase: () => void;
   handleRecalibrate: () => void;
-  handleTaskDotClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   handleCalStage3Complete: (successRate: number) => void;
 }
 
@@ -50,21 +47,16 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
   const [validationError, setValidationError] = useState<number | null>(null);
   const [gazeStability, setGazeStability] = useState<number | null>(null);
   const [calStage3SuccessRate, setCalStage3SuccessRate] = useState<number | null>(null);
-  const [currentDot, setCurrentDot] = useState<DotPosition | null>(null);
-  const [taskCount, setTaskCount] = useState(0);
-  const [taskResults, setTaskResults] = useState<TaskResult[]>([]);
   const [isValidationSuccessful, setIsValidationSuccessful] = useState(false);
   const [validationSequence, setValidationSequence] = useState(0);
   const [quality, setQuality] = useState<QualitySetting>('high');
   const [isFaceDetected, setIsFaceDetected] = useState(false);
+  
   const updateQuality = useCallback((nextQuality: QualitySetting) => {
     setQuality(nextQuality);
   }, []);
 
-  const collectedData = useRef<DataRecord[]>([]);
   const validationGazePoints = useRef<{ x: number; y: number }[]>([]);
-  const taskStartTime = useRef<number | null>(null);
-  const taskStartTimes = useRef<Record<number, number>>({});
   const hasWebgazerStarted = useRef(false);
 
   const safelyEndWebgazer = useCallback(() => {
@@ -72,6 +64,7 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     try {
+      console.log('🛑 Stopping WebGazer');
       window.webgazer.end();
     } catch (error) {
       console.error('Failed to stop WebGazer', error);
@@ -80,6 +73,20 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const safelyPauseWebgazer = useCallback(() => {
+    if (!window.webgazer || !hasWebgazerStarted.current) {
+      return;
+    }
+    try {
+      console.log('⏸️ Pausing WebGazer');
+      window.webgazer.pause();
+      window.webgazer.clearGazeListener();
+    } catch (error) {
+      console.error('Failed to pause WebGazer', error);
+    }
+  }, []);
+
+  // Load WebGazer script
   useEffect(() => {
     const script = document.createElement('script');
     script.src = '/webgazer.js';
@@ -98,14 +105,16 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [safelyEndWebgazer]);
 
+  // Show/hide prediction points based on game state
   useEffect(() => {
     if (!isReady || !window.webgazer) {
       return;
     }
-    const shouldShow = gameState === 'validating' || gameState === 'task' || gameState === 'calibrating';
+    const shouldShow = gameState === 'validating' || gameState === 'calibrating';
     window.webgazer.showPredictionPoints(shouldShow);
   }, [gameState, isReady]);
 
+  // Face detection for webcam check
   useEffect(() => {
     if (gameState !== 'webcamCheck' || !window.webgazer) {
       return;
@@ -124,20 +133,17 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [gameState]);
 
+  // Start WebGazer session
   const startSession = useCallback(() => {
     if (!isReady || !window.webgazer) {
       return;
     }
-    setTaskResults([]);
-    setTaskCount(0);
-    setCurrentDot(null);
+    console.log('▶️ Starting WebGazer session');
     setValidationError(null);
     setGazeStability(null);
     setCalStage3SuccessRate(null);
     setIsValidationSuccessful(false);
-    collectedData.current = [];
     validationGazePoints.current = [];
-    taskStartTimes.current = {};
 
     window.webgazer.setTracker('TFFacemesh');
     window.webgazer.setRegression('ridge');
@@ -148,129 +154,105 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     window.webgazer.begin();
     hasWebgazerStarted.current = true;
     window.webgazer.applyKalmanFilter(USE_KALMAN_FILTER);
-    setIsFaceDetected(false);
-    setGameState('webcamCheck');
-  }, [isReady]);
 
-  const handleCalibrationComplete = useCallback(() => {
-    setGameState('confirmValidation');
-  }, []);
-
-  const handleWebcamCheckComplete = useCallback(() => {
-    if (!window.webgazer) {
-      return;
-    }
-    const constraints = CAMERA_SETTINGS[quality];
-    if (typeof window.webgazer.setCameraConstraints === 'function') {
+    if (window.webgazer.setCameraConstraints) {
+      const settings = CAMERA_SETTINGS[quality];
       window.webgazer.setCameraConstraints({
         video: {
-          width: constraints.width,
-          height: constraints.height,
-          frameRate: constraints.frameRate,
+          width: { ideal: settings.width },
+          height: { ideal: settings.height },
+          frameRate: { ideal: settings.frameRate },
         },
       });
     }
-    window.webgazer.setRegression('ridge');
-    setGameState('calibrating');
-  }, [quality]);
 
-  const startValidation = useCallback(() => {
-    setValidationError(null);
-    setGazeStability(null);
-    setIsValidationSuccessful(false);
-    setGameState('validating');
+    setGameState('webcamCheck');
+  }, [isReady, quality]);
+
+  // NEW: Stop WebGazer session completely
+  const stopSession = useCallback(() => {
+    console.log('🛑 Stopping WebGazer session');
+    safelyEndWebgazer();
+    setGameState('idle');
+    setLiveGaze({ x: null, y: null });
+  }, [safelyEndWebgazer]);
+
+  // NEW: Pause WebGazer session (can be resumed)
+  const pauseSession = useCallback(() => {
+    console.log('⏸️ Pausing WebGazer session');
+    safelyPauseWebgazer();
+    setLiveGaze({ x: null, y: null });
+  }, [safelyPauseWebgazer]);
+
+  const handleWebcamCheckComplete = useCallback(() => {
+    setGameState('calibrating');
   }, []);
 
-  const startTaskPhase = useCallback(() => {
-    setTaskCount(0);
-    setTaskResults([]);
-    setCurrentDot(null);
-    setGameState('task');
+  /*
+  const handleCalibrationComplete = useCallback(() => {
+    setGameState('validating');
+  }, []);
+  */
+
+  const handleCalibrationComplete = useCallback(() => {
+    setGameState('confirmValidation');  // ✅ Show confirmation first
   }, []);
 
   const handleRecalibrate = useCallback(() => {
-    setValidationError(null);
-    setGazeStability(null);
-    setIsValidationSuccessful(false);
-    setCalStage3SuccessRate(null);
-    setTaskResults([]);
-    setTaskCount(0);
-    setCurrentDot(null);
     if (window.webgazer) {
       window.webgazer.clearData();
     }
+    setValidationError(null);
+    setGazeStability(null);
+    setIsValidationSuccessful(false);
+    setValidationSequence(0);
     setGameState('calibrating');
   }, []);
-
-  const handleTaskDotClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (!window.webgazer) {
-      return;
-    }
-    if (typeof window.webgazer.recordScreenPosition === 'function') {
-      window.webgazer.recordScreenPosition(event.clientX, event.clientY, 'click');
-    }
-
-    const clickTime = performance.now();
-    const lastGazeRecord = [...collectedData.current].reverse().find(d => d.gazeX !== null && d.gazeY !== null);
-    const lastGazePos = lastGazeRecord ? { x: lastGazeRecord.gazeX, y: lastGazeRecord.gazeY } : null;
-    const clickPos = { x: event.clientX, y: event.clientY };
-    const targetPos = currentDot;
-    const timeTaken = taskStartTime.current ? clickTime - taskStartTime.current : 0;
-
-    let gazeToTargetDistance: number | null = null;
-    let gazeToClickDistance: number | null = null;
-
-    if (lastGazePos) {
-      if (targetPos) {
-        gazeToTargetDistance = Math.sqrt((targetPos.x - (lastGazePos.x ?? 0)) ** 2 + (targetPos.y - (lastGazePos.y ?? 0)) ** 2);
-      }
-      gazeToClickDistance = Math.sqrt((clickPos.x - (lastGazePos.x ?? 0)) ** 2 + (clickPos.y - (lastGazePos.y ?? 0)) ** 2);
-    }
-
-    setTaskResults(prev => [...prev, {
-      taskId: taskCount + 1,
-      timeTaken,
-      gazeToTargetDistance,
-      gazeToClickDistance,
-    }]);
-
-    if (taskCount < TOTAL_TASKS - 1) {
-      setTaskCount(prev => prev + 1);
-    } else {
-      setGameState('finished');
-      safelyEndWebgazer();
-    }
-  }, [currentDot, taskCount, safelyEndWebgazer]);
 
   const handleCalStage3Complete = useCallback((successRate: number) => {
     setCalStage3SuccessRate(successRate);
   }, []);
 
-  useEffect(() => {
-    if (gameState === 'calibrating' && window.webgazer) {
-      const gazeListener = (data: { x: number; y: number } | null) => {
-        if (data) {
-          setLiveGaze({ x: data.x, y: data.y });
-        }
-      };
-      window.webgazer.setGazeListener(gazeListener);
-      return () => {
-        window.webgazer?.clearGazeListener();
-      };
-    }
-  }, [gameState]);
+  const startValidation = useCallback(() => {
+    validationGazePoints.current = [];
+    setValidationError(null);
+    setGazeStability(null);
+    setGameState('validating');
+  }, []);
 
+  
+  // Live gaze tracking
+  useEffect(() => {
+    if (!isReady || !window.webgazer) {
+      return;
+    }
+    
+    // Update liveGaze during both calibration (Stage 3) AND validation
+    if (gameState !== 'validating' && gameState !== 'calibrating') {
+      return;
+    }
+
+    const gazeListener = (data: { x: number; y: number } | null) => {
+      if (data?.x != null && data?.y != null) {
+        setLiveGaze({ x: data.x, y: data.y });
+      }
+    };
+
+    window.webgazer.setGazeListener(gazeListener);
+    return () => {
+      window.webgazer?.clearGazeListener();
+    };
+  }, [gameState, isReady]);
+
+  // Validation measurement
   useEffect(() => {
     if (gameState !== 'validating' || !window.webgazer) {
       return;
     }
 
     validationGazePoints.current = [];
-    setValidationError(null);
-    setGazeStability(null);
-
     const validationListener = (data: { x: number; y: number } | null) => {
-      if (data) {
+      if (data?.x != null && data?.y != null) {
         validationGazePoints.current.push({ x: data.x, y: data.y });
       }
     };
@@ -308,6 +290,8 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
       } else {
         setIsValidationSuccessful(false);
       }
+      
+      setGameState('validationResult');
     }, 3000);
 
     return () => {
@@ -316,65 +300,6 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [gameState, handleRecalibrate]);
 
-  useEffect(() => {
-    if (gameState === 'task' && taskCount < TOTAL_TASKS) {
-      let x: number;
-      let y: number;
-      const padding = 50;
-      do {
-        x = Math.floor(Math.random() * (window.innerWidth - padding * 2)) + padding;
-        y = Math.floor(Math.random() * (window.innerHeight - padding * 2)) + padding;
-      } while (x < FORBIDDEN_ZONE.width && y < FORBIDDEN_ZONE.height);
-      setCurrentDot({ x, y });
-
-      const startTime = performance.now();
-      taskStartTime.current = startTime;
-      taskStartTimes.current[taskCount + 1] = startTime;
-    }
-  }, [gameState, taskCount]);
-
-  useEffect(() => {
-    if (gameState !== 'task' || !window.webgazer) {
-      return;
-    }
-
-    const gazeListener = (data: { x: number; y: number } | null) => {
-      if (data) {
-        collectedData.current.push({
-          timestamp: performance.now(),
-          taskId: taskCount + 1,
-          targetX: currentDot?.x ?? null,
-          targetY: currentDot?.y ?? null,
-          gazeX: data.x,
-          gazeY: data.y,
-          mouseX: null,
-          mouseY: null,
-        });
-      }
-    };
-    window.webgazer.setGazeListener(gazeListener);
-
-    const mouseMoveListener = (event: MouseEvent) => {
-      collectedData.current.push({
-        timestamp: performance.now(),
-        taskId: taskCount + 1,
-        targetX: currentDot?.x ?? null,
-        targetY: currentDot?.y ?? null,
-        gazeX: null,
-        gazeY: null,
-        mouseX: event.clientX,
-        mouseY: event.clientY,
-      });
-    };
-
-    document.addEventListener('mousemove', mouseMoveListener);
-
-    return () => {
-      window.webgazer?.clearGazeListener();
-      document.removeEventListener('mousemove', mouseMoveListener);
-    };
-  }, [gameState, taskCount, currentDot]);
-
   const value: WebgazerContextValue = {
     gameState,
     isReady,
@@ -382,21 +307,18 @@ export const WebgazerProvider = ({ children }: { children: ReactNode }) => {
     validationError,
     gazeStability,
     calStage3SuccessRate,
-    currentDot,
-    taskCount,
-    taskResults,
     isValidationSuccessful,
     validationSequence,
     quality,
     isFaceDetected,
     startSession,
+    stopSession,      // NEW
+    pauseSession,     // NEW
     setQuality: updateQuality,
     handleCalibrationComplete,
     handleWebcamCheckComplete,
     startValidation,
-    startTaskPhase,
     handleRecalibrate,
-    handleTaskDotClick,
     handleCalStage3Complete,
   };
 

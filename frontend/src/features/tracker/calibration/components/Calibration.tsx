@@ -29,7 +29,9 @@ const StageInstruction = ({ stage, onStart }: StageInstructionProps) => {
       <h2>캘리브레이션 ({stage - 1}/2)</h2>
       <h3>{title}</h3>
       <p>{description}</p>
-      <button onClick={onStart}>시작하기</button>
+      <button className="primary-button" onClick={onStart}>
+        시작하기
+      </button>
     </div>
   );
 };
@@ -98,6 +100,11 @@ const Calibration = ({ onComplete, liveGaze, onCalStage3Complete }: CalibrationP
         }
       }
       setIsGazeOnTarget(isOnTarget);
+      if (isOnTarget) {
+        console.log('✅ Gaze ON target!'); // Add this
+        //stage3SuccessFrameCount.current += 1;
+        // ...
+      }
 
       if (isOnTarget) {
         stage3SuccessFrameCount.current += 1;
@@ -178,7 +185,7 @@ const Calibration = ({ onComplete, liveGaze, onCalStage3Complete }: CalibrationP
   if (step === 3) {
     return (
       <div className="pursuit-container">
-        <p>캘리브레이션 (2/2): 시선(빨간 점)을 움직이는 목표점 안에 유지해주세요.</p>
+        <p>캘리브레이션 (2/2): 시선(녹색 점)을 움직이는 목표점 안에 유지해주세요.</p>
         <div className="progress-bar-container">
           <div className="progress-bar" style={{ width: `${progress * 100}%` }} />
         </div>

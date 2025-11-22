@@ -11,6 +11,13 @@ node_modules
 dist
 dist-ssr
 *.local
+package-lock.json
+
+.env
+frontend/.env
+
+process.env
+frontend/process.env
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +29,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+package-lock.json
+<<<<<<< HEAD
+package.json
+=======
+frontend/package-lock.json
+>>>>>>> origin/feat/frontend_calibration

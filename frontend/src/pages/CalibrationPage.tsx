@@ -5,7 +5,6 @@ import './CalibrationPage.css';
 import { useTrackingSession } from '../state/trackingSessionContext';
 import Calibration from '../features/tracker/calibration/components/Calibration';
 import Validation from '../features/tracker/calibration/components/Validation';
-import Task from '../features/tracker/calibration/components/Task';
 import WebcamCheck from '../features/tracker/calibration/components/WebcamCheck';
 import { useWebgazer } from '../hooks/tracking/useWebgazer';
 import { RECALIBRATION_THRESHOLD } from '../features/tracker/calibration/constants';
@@ -19,23 +18,31 @@ const CalibrationPage = () => {
     liveGaze,
     validationError,
     gazeStability,
-    currentDot,
-    taskCount,
     isValidationSuccessful,
     validationSequence,
     startSession,
+    stopSession,
     handleCalibrationComplete,
     quality,
     setQuality,
     isFaceDetected,
     handleWebcamCheckComplete,
     startValidation,
-    startTaskPhase,
     handleRecalibrate,
-    handleTaskDotClick,
     handleCalStage3Complete,
   } = useWebgazer();
   const lastSequenceRef = useRef(validationSequence);
+  const isNavigatingToTraining = useRef(false);
+
+   useEffect(() => {
+     return () => {
+       if (!isNavigatingToTraining.current) {
+         stopSession(); // Only stop if NOT going to training
+       }
+     };
+   }, [stopSession]);
+
+
 
   useEffect(() => {
     if (
@@ -48,17 +55,23 @@ const CalibrationPage = () => {
       saveCalibrationResult({
         status: 'validated',
         validationError,
+        validationStdDev: gazeStability,
         completedAt: new Date().toISOString(),
       });
-      navigate('/training');
     }
   }, [
     isValidationSuccessful,
     validationSequence,
     validationError,
+    gazeStability,
     saveCalibrationResult,
-    navigate,
   ]);
+
+  const handleProceedToTraining = () => {
+     isNavigatingToTraining.current = true; // Set flag
+     window.webgazer?.showPredictionPoints(false);
+     navigate('/training');
+   };
 
   const renderContent = () => {
     if (!isReady) {
@@ -164,38 +177,25 @@ const CalibrationPage = () => {
         );
       case 'validating':
         return (
-          <div className="calibration-screen">
+          <div className="calibration-screen validation-active">
             <Validation
               validationError={validationError}
               gazeStability={gazeStability}
               onRecalibrate={handleRecalibrate}
-              onStartTask={startTaskPhase}
             />
           </div>
         );
-      case 'task':
+      case 'validationResult':
         return (
-          <div className="calibration-screen">
-            <Task taskCount={taskCount} currentDot={currentDot} onDotClick={handleTaskDotClick} />
-          </div>
-        );
-      case 'finished':
-        return (
-          <div className="calibration-screen">
-            <div className="results-container">
-              <h2>Calibration Measurement Complete</h2>
-              <p className="accuracy-message">
-                Great work! We've recorded the final accuracy metrics. You can proceed to training or recalibrate for better results.
-              </p>
-              <div className="button-group">
-                <button className="primary-button" onClick={() => navigate('/training')}>
-                  Go to Training
-                </button>
-                <button className="secondary-button" onClick={handleRecalibrate}>
-                  Recalibrate
-                </button>
-              </div>
-            </div>
+          <div className="calibration-screen validation-active">
+            <Validation
+              validationError={validationError}
+              gazeStability={gazeStability}
+              onRecalibrate={handleRecalibrate}
+              canProceed={isValidationSuccessful}
+              onProceed={handleProceedToTraining}  
+              
+            />
           </div>
         );
       default:

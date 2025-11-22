@@ -1,15 +1,21 @@
-// src/pages/TrainingPage.tsx
-import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+// frontend/src/pages/TrainingPage.tsx
+// CORRECTED: Only stops WebGazer when explicitly navigating to Dashboard
+// ResultsPage handles stopping WebGazer, so we don't interfere with the normal flow
+
+import { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Scene } from '../components/Scene';
+import { TrainingScene } from '../components/TrainingScene';
+import { TrackingDataRecord } from '../hooks/useTrackingData';
 import './TrainingPage.css';
 import {
   TrainingDataPoint,
   TrainingSessionSummary,
   useTrackingSession,
 } from '../state/trackingSessionContext';
-import { serializeSessionToCsv } from '../utils/sessionExport';
+import { useAuth } from '../state/authContext';
 import { useWebgazer } from '../hooks/tracking/useWebgazer';
+import { serializeSessionToCsv } from '../utils/sessionExport';
+import { calculatePerformanceAnalytics } from '../utils/analytics';
 
 const TrainingPage = () => {
   const navigate = useNavigate();
@@ -19,172 +25,148 @@ const TrainingPage = () => {
     calibrationResult,
     surveyResponses,
     consentAccepted,
+    activeSessionId,
   } = useTrackingSession();
+  
+  const { user } = useAuth();
+  const { stopSession } = useWebgazer();
+  
   const [timeRemaining, setTimeRemaining] = useState(60);
   const [isTraining, setIsTraining] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
-  const [score, setScore] = useState(0);
-  const trainingDataRef = useRef<TrainingDataPoint[]>([]);
-  const startTimeRef = useRef<number>(0);
+  const [finalScore, setFinalScore] = useState(0);
+  const trainingStartTime = useRef<number>(0);
 
-  useEffect(() => {
-    if (!calibrationResult) {
-      navigate('/calibration');
-      return;
-    }
-    if (
-      calibrationResult.status !== 'validated' &&
-      calibrationResult.status !== 'skipped'
-    ) {
-      navigate('/calibration');
-    }
-  }, [calibrationResult, navigate]);
-
-  // Timer countdown
-  useEffect(() => {
-    if (!isTraining || isComplete) return;
-
-    const interval = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev <= 1) {
-          handleTrainingComplete();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isTraining, isComplete]);
-
-  const { isValidationSuccessful, validationSequence } = useWebgazer();
-  const validationTriggerRef = useRef(validationSequence);
+  // ❌ REMOVED: No automatic cleanup on unmount
+  // This was causing WebGazer to stop when transitioning from CalibrationPage
+  // WebGazer should stay running during: CalibrationPage → TrainingPage → ResultsPage
+  // Only stop when explicitly navigating to Dashboard
 
   const handleStartTraining = useCallback(() => {
+    trainingStartTime.current = Date.now();
     setIsTraining(true);
     setIsComplete(false);
-    startTimeRef.current = Date.now();
-    trainingDataRef.current = [];
-    setScore(0);
-    setTimeRemaining(60);
   }, []);
 
-  const summarizeTrainingData = useMemo(() => {
-    return (data: TrainingDataPoint[]) => {
-      if (data.length === 0) {
-        return {
-          targetsHit: 0,
-          totalTargets: 0,
+  // Convert TrackingDataRecord to TrainingDataPoint format
+  const convertTrainingData = (rawData: TrackingDataRecord[]): TrainingDataPoint[] => {
+    return rawData.map(record => ({
+      timestamp: record.timestamp,
+      gazeX: record.gazeX,
+      gazeY: record.gazeY,
+      mouseX: record.mouseX,
+      mouseY: record.mouseY,
+      targetHit: record.hitRegistered,
+      targetId: record.targetId,
+      targetX: record.targetX,
+      targetY: record.targetY,
+    }));
+  };
+
+  const handleTrainingComplete = useCallback((
+    score: number,
+    targetsHit: number,
+    rawTrackingData: TrackingDataRecord[]
+  ) => {
+    setIsComplete(true);
+    setIsTraining(false);
+    setFinalScore(score);
+
+    console.log('📊 Processing training session:', {
+      score,
+      targetsHit,
+      rawDataPoints: rawTrackingData.length,
+    });
+
+    // Convert the raw tracking data to the format expected by the session system
+    const convertedData = convertTrainingData(rawTrackingData);
+
+    // Calculate metrics from the collected data
+    const metrics = convertedData.length > 0
+      ? calculatePerformanceAnalytics(convertedData)
+      : {
           accuracy: 0,
           avgReactionTime: 0,
           gazeAccuracy: 0,
           mouseAccuracy: 0,
+          totalTargets: 0,
+          targetsHit: 0,
         };
-      }
-
-      const hits = data.filter(point => point.targetHit);
-      const totalTargets = data.filter(point => point.targetId !== null).length || hits.length;
-      const targetsHit = hits.length;
-      const accuracy = totalTargets > 0 ? (targetsHit / totalTargets) * 100 : 0;
-      const avgReactionTime = hits.length > 0
-        ? hits.reduce((sum, hit) => sum + hit.timestamp, 0) / hits.length
-        : 0;
-      const gazeAccuracy = (data.filter(d => d.gazeX !== null && d.gazeY !== null).length / data.length) * 100;
-      const mouseAccuracy = (data.filter(d => d.mouseX !== null && d.mouseY !== null).length / data.length) * 100;
-
-      return {
-        targetsHit,
-        totalTargets,
-        accuracy,
-        avgReactionTime,
-        gazeAccuracy,
-        mouseAccuracy,
-      };
-    };
-  }, []);
-
-  const handleTrainingComplete = () => {
-    setIsComplete(true);
-    setIsTraining(false);
-
-    const analytics = summarizeTrainingData(trainingDataRef.current);
-
-    const baseSessionRecord: TrainingSessionSummary = {
+    
+    // Create the session record with actual data
+    const sessionRecord: TrainingSessionSummary = {
       id: Date.now().toString(),
       date: new Date().toISOString(),
       duration: 60,
       score: score,
-      accuracy: analytics.accuracy,
-      targetsHit: analytics.targetsHit,
-      totalTargets: analytics.totalTargets,
-      avgReactionTime: analytics.avgReactionTime,
-      gazeAccuracy: analytics.gazeAccuracy,
-      mouseAccuracy: analytics.mouseAccuracy,
-      rawData: trainingDataRef.current,
-      csvData: '',
+      accuracy: metrics.accuracy,
+      targetsHit: metrics.targetsHit || score,
+      totalTargets: metrics.totalTargets || metrics.targetsHit || score,
+      avgReactionTime: metrics.avgReactionTime,
+      gazeAccuracy: metrics.gazeAccuracy,
+      mouseAccuracy: metrics.mouseAccuracy,
+      screenSize: {
+        width: window.innerWidth,
+        height: window.innerHeight
+      },
+      rawData: convertedData, // Now includes actual collected data (may be empty if collection failed)
+      csvData: '', // Will be set below
     };
 
+    // Generate CSV with all the data
     const csvData = serializeSessionToCsv({
-      session: baseSessionRecord,
+      session: sessionRecord,
       surveyResponses,
       consentAccepted,
       calibrationResult,
+      screenSize: sessionRecord.screenSize,
+      participantLabel: user?.email ?? user?.displayName ?? user?.uid,
     });
 
-    const sessionRecord: TrainingSessionSummary = {
-      ...baseSessionRecord,
+    // Update session record with CSV
+    const finalSession = {
+      ...sessionRecord,
       csvData,
     };
 
-    addSession(sessionRecord);
-    setActiveSessionId(sessionRecord.id);
-  };
-
-  const handleViewResults = () => {
-    navigate('/results');
-  };
-
-  const handleBackToDashboard = () => {
-    navigate('/dashboard');
-  };
-
-  const recordTrainingData = (data: Partial<TrainingDataPoint>) => {
-    trainingDataRef.current.push({
-      timestamp: Date.now() - startTimeRef.current,
-      gazeX: data.gazeX ?? null,
-      gazeY: data.gazeY ?? null,
-      mouseX: data.mouseX ?? null,
-      mouseY: data.mouseY ?? null,
-      targetHit: data.targetHit ?? false,
-      targetId: data.targetId ?? null,
+    // Save to context
+    addSession(finalSession);
+    setActiveSessionId(finalSession.id);
+    
+    console.log('✅ Training session saved:', {
+      id: finalSession.id,
+      score,
+      targetsHit,
+      dataPoints: convertedData.length,
+      accuracy: metrics.accuracy.toFixed(2) + '%',
     });
-  };
+  }, [addSession, setActiveSessionId, calibrationResult, surveyResponses, consentAccepted, user]);
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  const handleViewResults = useCallback(() => {
+    // ✅ Don't stop WebGazer here - ResultsPage will handle it on mount
+    navigate('/results', {
+      state: {
+        fromTrainingComplete: true,
+        sessionId: activeSessionId ?? null,
+      },
+    });
+  }, [navigate, activeSessionId]);
 
-  useEffect(() => {
-    if (
-      isValidationSuccessful &&
-      validationSequence > validationTriggerRef.current &&
-      !isTraining
-    ) {
-      validationTriggerRef.current = validationSequence;
-      handleStartTraining();
-    }
-  }, [
-    isValidationSuccessful,
-    validationSequence,
-    handleStartTraining,
-    isTraining,
-  ]);
+  const handleBackToDashboard = useCallback(() => {
+    // ✅ Only stop WebGazer when navigating to Dashboard
+    // (Dashboard doesn't use WebGazer, so we need to clean it up)
+    console.log('🏠 Navigating to Dashboard - stopping WebGazer');
+    stopSession();
+    navigate('/dashboard');
+  }, [stopSession, navigate]);
 
   return (
     <div className="training-page">
-      <Scene />
+      {/* Training Scene - renders when training is active */}
+      {isTraining && (
+        <TrainingScene onComplete={handleTrainingComplete} />
+      )}
+      
       {/* Pre-Training Instructions */}
       {!isTraining && !isComplete && (
         <div className="training-overlay">
@@ -210,8 +192,8 @@ const TrainingPage = () => {
               <div className="info-item">
                 <span className="info-icon">📊</span>
                 <div>
-                  <h3>Get Insights</h3>
-                  <p>After training, view detailed analytics and CSV data</p>
+                  <h3>Improve Your Performance</h3>
+                  <p>Compare your results with previous sessions</p>
                 </div>
               </div>
             </div>
@@ -228,53 +210,39 @@ const TrainingPage = () => {
         </div>
       )}
 
-      {/* Training Complete */}
+      {/* Post-Training Results */}
       {isComplete && (
         <div className="training-overlay">
           <div className="training-complete">
             <h1>Training Complete!</h1>
             <div className="completion-stats">
-              <div className="stat">
-                <span className="stat-label">Final Score</span>
-                <span className="stat-value">{score}</span>
+              <div className="stat-card">
+                <span className="stat-icon">🎯</span>
+                <div className="stat-content">
+                  <h3>Final Score</h3>
+                  <p className="stat-value">{finalScore}</p>
+                </div>
               </div>
-              <div className="stat">
-                <span className="stat-label">Duration</span>
-                <span className="stat-value">60s</span>
+              <div className="stat-card">
+                <span className="stat-icon">⏱️</span>
+                <div className="stat-content">
+                  <h3>Duration</h3>
+                  <p className="stat-value">60s</p>
+                </div>
               </div>
-              <div className="stat">
-                <span className="stat-label">Data Points</span>
-                <span className="stat-value">{trainingDataRef.current.length}</span>
-              </div>
-            </div>
-
-            <div className="completion-message">
-              <p>✅ Your training data has been saved and converted to CSV</p>
-              <p>View detailed analytics and download your data on the results page</p>
             </div>
 
             <div className="training-controls">
               <button className="view-results-button" onClick={handleViewResults}>
-                View Results & Analytics
+                View Detailed Results
+              </button>
+              <button className="start-button" onClick={handleStartTraining}>
+                Train Again
               </button>
               <button className="back-button-inline" onClick={handleBackToDashboard}>
                 Back to Dashboard
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* HUD - Timer and Score */}
-      {isTraining && (
-        <div className="training-hud">
-          <div className="hud-item">
-            <span className="hud-label">Time</span>
-            <span className="hud-value time">{formatTime(timeRemaining)}</span>
-          </div>
-          <div className="hud-item">
-            <span className="hud-label">Score</span>
-            <span className="hud-value score">{score}</span>
           </div>
         </div>
       )}

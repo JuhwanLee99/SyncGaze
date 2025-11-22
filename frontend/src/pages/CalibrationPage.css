@@ -209,8 +209,27 @@
 }
 
 /* Validation State */
+.calibration-screen.validation-active {
+  align-items: center;
+}
+
 .validation-container {
+  position: relative;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-height: 100vh;
+  padding: calc(50vh + 70px) 1.5rem 3rem;
+  box-sizing: border-box;
+}
+
+.validation-dot-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .validation-dot {
@@ -218,7 +237,7 @@
   height: 40px;
   background: #007bff;
   border-radius: 50%;
-  margin: 0 auto 3rem;
+  margin: 0;
   box-shadow: 0 0 40px rgba(0, 123, 255, 0.8);
   animation: glow 2s infinite;
 }
@@ -240,6 +259,12 @@
 .validation-container p {
   color: #b8b8d1;
   font-size: 1.1rem;
+}
+
+.validation-message {
+  margin-top: 1rem;
+  width: 100%;
+  max-width: 520px;
 }
 
 /* Results State */
@@ -406,6 +431,10 @@
   background-color: rgba(0, 0, 0, 0.4);
   text-align: center;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .instruction-box h2 {
@@ -428,6 +457,14 @@
   padding: 12px 24px;
   font-size: 1.1em;
   cursor: pointer;
+}
+
+.instruction-box .primary-button {
+  margin-top: 1.5rem;
+  align-self: center;
+  width: auto;
+  min-width: 180px;
+  padding: 0.9rem 2rem;
 }
 
 .pursuit-container {
@@ -483,10 +520,19 @@
   background: rgba(0, 0, 0, 0.7);
   padding: 40px;
   border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
 }
 
 .confirmation-box h2 {
   margin-bottom: 1rem;
+}
+
+.confirmation-box .primary-button {
+  margin-top: 1rem;
+  transform: translateY(0.8rem);
 }
 
 .calibration-grid {
@@ -531,20 +577,21 @@
   justify-content: center;
   gap: 1rem;
   margin-top: 1.5rem;
+  flex-wrap: wrap;
 }
 
-.task-dot {
-  position: absolute;
-  width: 30px;
-  height: 30px;
-  background-color: #28a745;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 0 15px rgba(40, 167, 69, 0.7);
-  transform: translate(-50%, -50%);
-  transition: transform 0.1s ease;
-}
+  .controls button {
+    padding: 0.85rem 1.75rem;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.3s ease;
+  }
 
-.task-dot:hover {
-  transform: translate(-50%, -50%) scale(1.2);
-}
+  .controls button:hover {
+    background: linear-gradient(135deg, #7587ff 0%, #8e6cc0 100%);
+    transform: translateY(-2px);
+  }

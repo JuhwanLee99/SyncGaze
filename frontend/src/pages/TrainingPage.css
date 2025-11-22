@@ -1,29 +1,35 @@
 /* src/pages/TrainingPage.css */
+/* TrainingPage.css */
 .training-page {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100vh;        /* Add this line */
+  min-height: 100vh;
   position: relative;
-  overflow: hidden;
   background: #000;
+  overflow: hidden;     /* Change from 'auto' to 'hidden' */
 }
-
 /* Overlay States */
 .training-overlay {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  min-height: 100vh;
   background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   z-index: 1000;
+  overflow-y: auto;
+  padding: clamp(2rem, 5vw, 4rem) clamp(1rem, 4vw, 3rem) clamp(3rem, 6vw, 5rem);
+  box-sizing: border-box;
+  gap: 2rem;
 }
 
 /* Pre-Training Instructions */
 .training-instructions {
-  max-width: 700px;
+  width: min(700px, 100%);
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
@@ -97,31 +103,39 @@
 
 .completion-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
   margin-bottom: 2rem;
+  width: 100%;
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.stat {
-  background: rgba(255, 255, 255, 0.03);
-  padding: 1.5rem;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+.stat-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 1.75rem;
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 1rem;
+  text-align: left;
 }
 
-.stat-label {
-  color: #b8b8d1;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+.stat-icon {
+  font-size: 2.5rem;
+}
+
+.stat-content h3 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.2rem;
+  color: #fff;
 }
 
 .stat-value {
   color: #fff;
-  font-size: 2rem;
+  font-size: 1.8rem;
   font-weight: bold;
 }
 
@@ -141,10 +155,24 @@
 
 /* Controls */
 .training-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-auto-flow: dense;
   gap: 1rem;
-  justify-content: center;
-  flex-wrap: wrap;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  align-items: stretch;
+}
+
+.training-controls button {
+  width: 100%;
+}
+
+.training-controls .view-results-button {
+  grid-column: 1 / -1;
+  max-width: 420px;
+  justify-self: center;
 }
 
 .start-button,
@@ -263,7 +291,7 @@
   }
 
   .training-controls {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
   .start-button,

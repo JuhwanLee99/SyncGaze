@@ -11,6 +11,7 @@ interface TargetProps {
 
 export const Target: React.FC<TargetProps> = ({ target, onHit }) => {
   const meshRef = useRef<THREE.Mesh>(null);
+  const glowRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const scaleRef = useRef(1);
 
@@ -19,7 +20,13 @@ export const Target: React.FC<TargetProps> = ({ target, onHit }) => {
     if (meshRef.current) {
       meshRef.current.userData.isTarget = true;
       meshRef.current.userData.targetId = target.id;
-      meshRef.current.name = target.id; // Also set name for easier identification
+      meshRef.current.name = target.id;
+    }
+    // Also mark the glow mesh so raycasting works on it too
+    if (glowRef.current) {
+      glowRef.current.userData.isTarget = true;
+      glowRef.current.userData.targetId = target.id;
+      glowRef.current.name = target.id;
     }
   }, [target.id]);
 
@@ -27,24 +34,8 @@ export const Target: React.FC<TargetProps> = ({ target, onHit }) => {
   useFrame((state, delta) => {
     if (!meshRef.current) return;
 
-    // Moving target logic
-    if (target.type === 'moving' && target.velocity) {
-      meshRef.current.position.add(target.velocity.clone().multiplyScalar(delta * 60));
-      
-      // Boundary check with reflection
-      const pos = meshRef.current.position;
-      if (Math.abs(pos.x) > 4.5) {
-        target.velocity.x *= -1;
-        pos.x = Math.sign(pos.x) * 4.5;
-      }
-      if (Math.abs(pos.y) > 4.5) {
-        target.velocity.y *= -1;
-        pos.y = Math.sign(pos.y) * 4.5;
-      }
-      if (Math.abs(pos.z) > 4.5) {
-        target.velocity.z *= -1;
-        pos.z = Math.sign(pos.z) * 4.5;
-      }
+    if (meshRef.current) {
+      meshRef.current.position.copy(target.position);
     }
 
     // Hover scale animation
@@ -64,9 +55,11 @@ export const Target: React.FC<TargetProps> = ({ target, onHit }) => {
   return (
     <mesh
       ref={meshRef}
+      name={target.id}  // ✅ Set name directly as prop
       position={target.position}
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
+      userData={{ isTarget: true, targetId: target.id }}  // ✅ Set userData directly
       castShadow
     >
       <sphereGeometry args={[target.radius, 32, 32]} />
@@ -78,8 +71,12 @@ export const Target: React.FC<TargetProps> = ({ target, onHit }) => {
         roughness={0.4}
       />
       
-      {/* Outer glow ring */}
-      <mesh scale={1.3}>
+      {/* Outer glow ring - also needs userData for raycasting */}
+      <mesh 
+        ref={glowRef}
+        scale={1.3}
+        userData={{ isTarget: true, targetId: target.id }}  // ✅ Add userData to glow
+      >
         <sphereGeometry args={[target.radius, 16, 16]} />
         <meshBasicMaterial 
           color={color}
