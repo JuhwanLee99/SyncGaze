@@ -7,8 +7,10 @@ import { useAuth } from '../state/authContext';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const { recentSessions, setActiveSessionId, calibrationResult, resetState } = useTrackingSession();
+  const { recentSessions, setActiveSessionId, calibrationResult, resetState, isAnonymousSession } = useTrackingSession();
   const { user, signOut: signOutUser } = useAuth();
+  const hasRealSession = recentSessions.some(session => !session.id.startsWith('mock-'));
+  const isNewUser = isAnonymousSession || !hasRealSession;
 
   const handleLogout = async () => {
     try {
@@ -48,7 +50,7 @@ const DashboardPage = () => {
       totalSessions,
       avgAccuracy: Number(avgAccuracy.toFixed(1)),
       bestAccuracy: Number(bestAccuracy.toFixed(1)),
-      avgReactionTime: Number(avgReactionTime.toFixed(0)),
+      avgReactionTime: Number(avgReactionTime.toFixed(2)),
     };
   }, [recentSessions]);
 
@@ -67,6 +69,9 @@ const DashboardPage = () => {
     }
     return 'Calibration pending.';
   }, [calibrationResult]);
+
+  // ✅ NEW: Conditional welcome message based on session history
+  const isFirstTime = recentSessions.length === 0;
 
   return (
     <div className="dashboard-page">
@@ -92,10 +97,14 @@ const DashboardPage = () => {
 
       {/* Main Content */}
       <main className="dashboard-main">
-        {/* Welcome Section */}
+        {/* Welcome Section - ✅ NOW CONDITIONAL */}
         <section className="welcome-section">
-          <h2>Welcome back!</h2>
-          <p>Track your progress and start a new training session</p>
+          <h2>{isFirstTime ? 'Welcome to SyncGaze!' : 'Welcome back!'}</h2>
+          <p>
+            {isFirstTime 
+              ? 'Start your first training session to track your eye-tracking performance' 
+              : 'Track your progress and start a new training session'}
+          </p>
         </section>
 
         {/* Quick Stats */}
@@ -183,7 +192,7 @@ const DashboardPage = () => {
                       <td>
                         {session.targetsHit}/{session.totalTargets}
                       </td>
-                      <td>{session.avgReactionTime}ms</td>
+                      <td>{session.avgReactionTime.toFixed(2)}ms</td>
                       <td className="table-actions">
                         <button className="view-button" onClick={() => handleViewResults(session.id)}>
                           View Details

@@ -1,5 +1,6 @@
 // frontend/src/pages/TrainingPage.tsx
-// UPDATED: Now properly converts and stores training data
+// CORRECTED: Only stops WebGazer when explicitly navigating to Dashboard
+// ResultsPage handles stopping WebGazer, so we don't interfere with the normal flow
 
 import { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +13,7 @@ import {
   useTrackingSession,
 } from '../state/trackingSessionContext';
 import { useAuth } from '../state/authContext';
+import { useWebgazer } from '../hooks/tracking/useWebgazer';
 import { serializeSessionToCsv } from '../utils/sessionExport';
 import { calculatePerformanceAnalytics } from '../utils/analytics';
 
@@ -27,11 +29,18 @@ const TrainingPage = () => {
   } = useTrackingSession();
   
   const { user } = useAuth();
+  const { stopSession } = useWebgazer();
+  
   const [timeRemaining, setTimeRemaining] = useState(60);
   const [isTraining, setIsTraining] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
   const trainingStartTime = useRef<number>(0);
+
+  // ❌ REMOVED: No automatic cleanup on unmount
+  // This was causing WebGazer to stop when transitioning from CalibrationPage
+  // WebGazer should stay running during: CalibrationPage → TrainingPage → ResultsPage
+  // Only stop when explicitly navigating to Dashboard
 
   const handleStartTraining = useCallback(() => {
     trainingStartTime.current = Date.now();
@@ -49,8 +58,8 @@ const TrainingPage = () => {
       mouseY: record.mouseY,
       targetHit: record.hitRegistered,
       targetId: record.targetId,
-      targetX: record.targetX,     // ✅ ADD THIS
-      targetY: record.targetY,     // ✅ ADD THIS
+      targetX: record.targetX,
+      targetY: record.targetY,
     }));
   };
 
@@ -73,7 +82,16 @@ const TrainingPage = () => {
     const convertedData = convertTrainingData(rawTrackingData);
 
     // Calculate metrics from the collected data
-    const metrics = calculatePerformanceAnalytics(convertedData);
+    const metrics = convertedData.length > 0
+      ? calculatePerformanceAnalytics(convertedData)
+      : {
+          accuracy: 0,
+          avgReactionTime: 0,
+          gazeAccuracy: 0,
+          mouseAccuracy: 0,
+          totalTargets: 0,
+          targetsHit: 0,
+        };
     
     // Create the session record with actual data
     const sessionRecord: TrainingSessionSummary = {
@@ -82,8 +100,8 @@ const TrainingPage = () => {
       duration: 60,
       score: score,
       accuracy: metrics.accuracy,
-      targetsHit: metrics.targetsHit,
-      totalTargets: metrics.totalTargets,
+      targetsHit: metrics.targetsHit || score,
+      totalTargets: metrics.totalTargets || metrics.targetsHit || score,
       avgReactionTime: metrics.avgReactionTime,
       gazeAccuracy: metrics.gazeAccuracy,
       mouseAccuracy: metrics.mouseAccuracy,
@@ -91,7 +109,7 @@ const TrainingPage = () => {
         width: window.innerWidth,
         height: window.innerHeight
       },
-      rawData: convertedData, // Now includes actual collected data
+      rawData: convertedData, // Now includes actual collected data (may be empty if collection failed)
       csvData: '', // Will be set below
     };
 
@@ -122,20 +140,25 @@ const TrainingPage = () => {
       dataPoints: convertedData.length,
       accuracy: metrics.accuracy.toFixed(2) + '%',
     });
-  }, [addSession, setActiveSessionId, calibrationResult, surveyResponses, consentAccepted]);
+  }, [addSession, setActiveSessionId, calibrationResult, surveyResponses, consentAccepted, user]);
 
-  const handleViewResults = () => {
+  const handleViewResults = useCallback(() => {
+    // ✅ Don't stop WebGazer here - ResultsPage will handle it on mount
     navigate('/results', {
       state: {
         fromTrainingComplete: true,
         sessionId: activeSessionId ?? null,
       },
     });
-  };
+  }, [navigate, activeSessionId]);
 
-  const handleBackToDashboard = () => {
+  const handleBackToDashboard = useCallback(() => {
+    // ✅ Only stop WebGazer when navigating to Dashboard
+    // (Dashboard doesn't use WebGazer, so we need to clean it up)
+    console.log('🏠 Navigating to Dashboard - stopping WebGazer');
+    stopSession();
     navigate('/dashboard');
-  };
+  }, [stopSession, navigate]);
 
   return (
     <div className="training-page">

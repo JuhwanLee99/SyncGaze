@@ -292,6 +292,7 @@ const ResultsPage = () => {
     return sessionData ? calculatePerformanceAnalytics(sessionData.rawData) : null;
   }, [sessionData]);
 
+  const [missingRawData, setMissingRawData] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [autoUploadAttemptedFor, setAutoUploadAttemptedFor] = useState<string | null>(null);
   const [autoUploadStatus, setAutoUploadStatus] = useState<AutoUploadStatus>('idle');
@@ -300,6 +301,8 @@ const ResultsPage = () => {
   const heatmapCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const heatmapContainerRef = useRef<HTMLDivElement | null>(null);
   const participantLabel = user?.email ?? user?.displayName ?? user?.uid;
+  const locationState = (location.state as { fromTrainingComplete?: boolean; sessionId?: string } | null) ?? null;
+  const isCalibrationValidated = calibrationResult?.status === 'validated';
 
   // --- NEW: Performance Series Data Generation ---
   const performanceSeries = useMemo<SeriesConfig[]>(() => {
@@ -495,6 +498,26 @@ const ResultsPage = () => {
       }
   }, [sessionToDisplay, navigate, sessionData, activeSession, setActiveSessionId]);
   
+    setSessionData(activeSession);
+    if (activeSession.rawData && activeSession.rawData.length > 0) {
+      setMissingRawData(false);
+      setAnalytics(calculatePerformanceAnalytics(activeSession.rawData));
+    } else {
+      // Fallback to stored summary when raw data is missing
+      setMissingRawData(true);
+      setAnalytics({
+        totalTargets: activeSession.totalTargets,
+        targetsHit: activeSession.targetsHit,
+        accuracy: activeSession.accuracy,
+        avgReactionTime: activeSession.avgReactionTime,
+        gazeAccuracy: activeSession.gazeAccuracy,
+        mouseAccuracy: activeSession.mouseAccuracy,
+      });
+    }
+    setAutoUploadAttemptedFor(null);
+    setAutoUploadStatus(loadStoredUploadStatus(activeSession.id) ?? 'idle');
+  }, [activeSession, navigate]);
+
   useEffect(() => {
     if (!sessionData) {
       return;
@@ -646,6 +669,15 @@ const ResultsPage = () => {
       {/* Main Content */}
       <main className="results-main">
         {/* Key Metrics Section - UPDATED */}
+        {(!isCalibrationValidated || missingRawData) && (
+          <div className="alert-banner warning" role="alert">
+            {!isCalibrationValidated
+              ? '캘리브레이션이 완료되지 않아 정확도가 낮을 수 있습니다. 다시 캘리브레이션 후 측정해 보세요.'
+              : '원시 데이터가 비어 있어 요약값으로 표시 중입니다. 트레이닝을 다시 실행해 주세요.'}
+          </div>
+        )}
+
+        {/* Key Metrics */}
         <section className="metrics-section">
           {/* --- 상세 페이지 이동 버튼 --- */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>

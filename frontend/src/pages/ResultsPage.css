@@ -61,6 +61,20 @@
   color: #fff;
 }
 
+.alert-banner {
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 199, 120, 0.08);
+  color: #ffdca3;
+  margin-bottom: 2rem;
+  font-weight: 600;
+}
+
+.alert-banner.warning {
+  border-color: rgba(255, 199, 120, 0.4);
+}
+
 /* Metrics Section */
 .metrics-grid {
   display: grid;
