@@ -361,12 +361,12 @@ const SurveyPage = () => {
                     name="selfAssessment"
                     type="range"
                     min={1}
-                    max={7}
+                    max={10}
                     step={1}
                     value={formData.selfAssessment}
                     onChange={handleGeneralChange}
                   />
-                  <span>(7)</span>
+                  <span>(10)</span>
                   <strong>선택: {formData.selfAssessment}</strong>
                 </div>
               </label>
