@@ -11,6 +11,7 @@ import TrackerFlowPage from './pages/TrackerFlowPage';
 import SurveyPage from './pages/onboarding/SurveyPage';
 import ResearchConsentPage from './pages/onboarding/ResearchConsentPage';
 import { ReactElement } from 'react';
+import { useTrackingSession } from './state/trackingSessionContext';
 import { useAuth } from './state/authContext';
 
 //연구 감사인사용 페이지
@@ -25,6 +26,8 @@ const RouteLoader = () => (
 
 const ProtectedRoute = ({ children }: { children: ReactElement }) => {
   const location = useLocation();
+  const isAuthenticated = getIsAuthenticated();
+  const { surveyResponses } = useTrackingSession();
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -33,6 +36,13 @@ const ProtectedRoute = ({ children }: { children: ReactElement }) => {
 
   if (!user) {
     return <Navigate to="/auth" replace state={{ from: location }} />;
+  }
+
+  const needsSurvey = !surveyResponses;
+  const isSurveyRoute = location.pathname === '/onboarding/survey';
+
+  if (needsSurvey && !isSurveyRoute) {
+    return <Navigate to="/onboarding/survey" replace state={{ from: location }} />;
   }
 
   return children;
