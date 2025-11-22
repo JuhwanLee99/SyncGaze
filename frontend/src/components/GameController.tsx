@@ -73,15 +73,15 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
       type: isMoving ? 'moving' : 'static',
       velocity: isMoving
         ? new THREE.Vector3(
-            (Math.random() - 0.5) * 0.20,
-            (Math.random() - 0.5) * 0.20,
-            (Math.random() - 0.5) * 0.20
+            (Math.random() - 0.5) * 6.,
+            (Math.random() - 0.5) * 6.,
+            (Math.random() - 0.5) * 6.
           )
         : undefined
     };
   }, []);
 
-  useFrame(() => {
+  useFrame((state,delta) => {
     if (!isLocked) return;
 
     setTargets(prev => prev.map(target => {
@@ -89,6 +89,7 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
 
       const newPosition = target.position.clone();
       const newVelocity = target.velocity.clone();
+      
 
       // Room boundaries
       const bounds = {
@@ -101,8 +102,8 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
       };
 
       // Predict next position
-      const nextPosition = target.position.clone().add(target.velocity);
-
+      const nextPosition = target.position.clone().addScaledVector(target.velocity, delta);
+  
       // X boundaries
       if (nextPosition.x < bounds.minX || nextPosition.x > bounds.maxX) {
         newVelocity.x *= -1;
