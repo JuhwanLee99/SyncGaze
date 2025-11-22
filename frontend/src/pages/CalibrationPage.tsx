@@ -32,13 +32,17 @@ const CalibrationPage = () => {
     handleCalStage3Complete,
   } = useWebgazer();
   const lastSequenceRef = useRef(validationSequence);
+  const isNavigatingToTraining = useRef(false);
 
-  useEffect(() => {
-    return () => {
-      console.log('🧹 CalibrationPage unmounting - stopping WebGazer');
-      stopSession();
-    };
-  }, [stopSession]);
+   useEffect(() => {
+     return () => {
+       if (!isNavigatingToTraining.current) {
+         stopSession(); // Only stop if NOT going to training
+       }
+     };
+   }, [stopSession]);
+
+
 
   useEffect(() => {
     if (
@@ -60,6 +64,12 @@ const CalibrationPage = () => {
     validationError,
     saveCalibrationResult,
   ]);
+
+  const handleProceedToTraining = () => {
+     isNavigatingToTraining.current = true; // Set flag
+     window.webgazer?.showPredictionPoints(false);
+     navigate('/training');
+   };
 
   const renderContent = () => {
     if (!isReady) {
@@ -181,11 +191,8 @@ const CalibrationPage = () => {
               gazeStability={gazeStability}
               onRecalibrate={handleRecalibrate}
               canProceed={isValidationSuccessful}
-              onProceed={() => {
-                window.webgazer?.showPredictionPoints(false);
-                navigate('/training');
-              }}
-              //onProceed={() => navigate('/training')}
+              onProceed={handleProceedToTraining}  
+              
             />
           </div>
         );
