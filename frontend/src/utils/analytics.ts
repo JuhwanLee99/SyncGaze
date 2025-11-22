@@ -159,3 +159,69 @@ export const calculatePerformanceAnalytics = (data: TrainingDataPoint[]): Perfor
     gazeAimLatency: latencies.length ? latencies.reduce((a, b) => a + b, 0) / latencies.length : 0,
   };
 };
+
+export interface TimeSeriesPoint {
+  time: number;
+  gazeError: number | null;
+  mouseError: number | null;
+  synchronization: number | null;
+}
+
+export const generateErrorTimeSeries = (data: TrainingDataPoint[], duration: number): TimeSeriesPoint[] => {
+  if (!data.length) return [];
+
+  // 타임스탬프 기준으로 정렬
+  const sorted = [...data].sort((a, b) => a.timestamp - b.timestamp);
+  const startTime = sorted[0].timestamp;
+  const series: TimeSeriesPoint[] = [];
+
+  // 초 단위 버킷 생성
+  const buckets = new Map<number, TrainingDataPoint[]>();
+  for (let i = 0; i <= duration; i++) {
+    buckets.set(i, []);
+  }
+
+  // 데이터를 초 단위로 분류
+  sorted.forEach(point => {
+    const elapsed = Math.floor((point.timestamp - startTime) / 1000);
+    if (elapsed >= 0 && elapsed <= duration) {
+      buckets.get(elapsed)?.push(point);
+    }
+  });
+
+  // 각 초마다 평균 오차 계산
+  for (let i = 0; i <= duration; i++) {
+    const points = buckets.get(i) || [];
+    
+    let gazeErrSum = 0, gazeErrCount = 0;
+    let mouseErrSum = 0, mouseErrCount = 0;
+    let syncSum = 0, syncCount = 0;
+
+    points.forEach(p => {
+      // Gaze Error (Target vs Gaze)
+      if (p.targetX !== null && p.targetY !== null && p.gazeX !== null && p.gazeY !== null) {
+        gazeErrSum += Math.hypot(p.gazeX - p.targetX, p.gazeY - p.targetY);
+        gazeErrCount++;
+      }
+      // Mouse Error (Target vs Mouse)
+      if (p.targetX !== null && p.targetY !== null && p.mouseX !== null && p.mouseY !== null) {
+        mouseErrSum += Math.hypot(p.mouseX - p.targetX, p.mouseY - p.targetY);
+        mouseErrCount++;
+      }
+      // Synchronization (Gaze vs Mouse)
+      if (p.gazeX !== null && p.gazeY !== null && p.mouseX !== null && p.mouseY !== null) {
+        syncSum += Math.hypot(p.gazeX - p.mouseX, p.gazeY - p.mouseY);
+        syncCount++;
+      }
+    });
+
+    series.push({
+      time: i,
+      gazeError: gazeErrCount ? gazeErrSum / gazeErrCount : null,
+      mouseError: mouseErrCount ? mouseErrSum / mouseErrCount : null,
+      synchronization: syncCount ? syncSum / syncCount : null,
+    });
+  }
+
+  return series;
+};

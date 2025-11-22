@@ -14,7 +14,7 @@ import { useWebgazer } from '../hooks/tracking/useWebgazer';
 import { useAuth } from '../state/authContext';
 import { persistLatestSession } from '../utils/resultsStorage';
 // Analytics 인터페이스와 함수를 utils에서 import (ResultsPage 내의 중복 정의 제거)
-import { calculatePerformanceAnalytics, PerformanceAnalytics } from '../utils/analytics';
+import { calculatePerformanceAnalytics, generateErrorTimeSeries, PerformanceAnalytics } from '../utils/analytics';
 
 interface Analytics {
   totalTargets: number;
@@ -41,6 +41,19 @@ type AccuracySeriesConfig = {
   gradientId: string;
   points: AccuracyPoint[];
   tooltipLabel: string;
+};
+
+type SeriesPoint = {
+  time: number;
+  value: number | null;
+};
+
+type SeriesConfig = {
+  key: string;
+  label: string;
+  color: string;
+  gradientId: string;
+  points: SeriesPoint[];
 };
 
 type HeatmapPoint = { x: number; y: number };
@@ -101,40 +114,45 @@ const generateCumulativeSeries = (
   return series;
 };
 
-const AccuracyLineChart = ({ series, duration }: { series: AccuracySeriesConfig[]; duration: number }) => {
-  const activeSeries = series.filter(s => s.points.length);
+// --- PerformanceLineChart Component (UPDATED) ---
+const PerformanceLineChart = ({ series, duration }: { series: SeriesConfig[]; duration: number }) => {
+  const activeSeries = series.filter(s => s.points.some(p => p.value !== null));
 
   if (!activeSeries.length) {
-    return <div className="chart-empty">No accuracy data collected for this session.</div>;
+    return <div className="chart-empty">No performance data collected for this session.</div>;
   }
 
   const width = 720;
   const height = 360;
   const padding = 56;
-  const xMax = Math.max(
-    duration,
-    ...activeSeries.map(s => s.points.at(-1)?.time ?? 0),
-    1,
-  );
-  const yMax = 100;
+  
+  // X축 최대값 계산
+  const xMax = Math.max(duration, ...activeSeries.map(s => s.points.at(-1)?.time ?? 0), 1);
+  
+  // Y축 최대값 계산 (오차 px이므로 데이터의 최대값 + 여유분)
+  const allValues = activeSeries.flatMap(s => s.points.map(p => p.value).filter((v): v is number => v !== null));
+  const maxVal = allValues.length ? Math.max(...allValues) : 100;
+  const yMax = Math.ceil(maxVal * 1.1); // 10% 여유
 
   const xScale = (time: number) => padding + (time / xMax) * (width - padding * 2);
   const yScale = (value: number) => height - padding - (value / yMax) * (height - padding * 2);
 
   const xTicks = 6;
   const xTickValues = Array.from({ length: xTicks }, (_, i) => Math.round((xMax / (xTicks - 1)) * i));
-  const yTickValues = [0, 25, 50, 75, 100];
+  
+  // Y축 눈금 5개 생성
+  const yTickValues = Array.from({ length: 5 }, (_, i) => Math.round((yMax / 4) * i));
 
   const formatTime = (seconds: number) => `${seconds}s`;
 
   return (
     <div className="chart-container">
-      <svg viewBox={`0 0 ${width} ${height}`} className="chart-svg" role="img" aria-label="Accuracy over time">
+      <svg viewBox={`0 0 ${width} ${height}`} className="chart-svg" role="img" aria-label="Performance trends over time">
         <defs>
           {activeSeries.map(({ gradientId, color }) => (
             <linearGradient key={gradientId} id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor={color} stopOpacity="0.95" />
-              <stop offset="100%" stopColor={color} stopOpacity="0.25" />
+              <stop offset="0%" stopColor={color} stopOpacity="0.8" />
+              <stop offset="100%" stopColor={color} stopOpacity="0.1" />
             </linearGradient>
           ))}
         </defs>
@@ -179,7 +197,7 @@ const AccuracyLineChart = ({ series, duration }: { series: AccuracySeriesConfig[
             className="chart-label"
             textAnchor="end"
           >
-            {tick}%
+            {tick}
           </text>
         ))}
 
@@ -194,41 +212,36 @@ const AccuracyLineChart = ({ series, duration }: { series: AccuracySeriesConfig[
           textAnchor="middle"
           transform={`rotate(-90 16 ${height / 2})`}
         >
-          Accuracy (%)
+          Error (px)
         </text>
 
         {/* Data lines & points */}
-        {activeSeries.map(({ key, points, gradientId, color, tooltipLabel }) => {
-          const pathD = points
+        {activeSeries.map(({ key, points, gradientId, color }) => {
+          // null 값을 건너뛰고 유효한 구간만 그림
+          const validPoints = points.filter(p => p.value !== null) as { time: number, value: number }[];
+          if (validPoints.length < 2) return null;
+
+          const pathD = validPoints
             .map((point, index) => {
               const prefix = index === 0 ? 'M' : 'L';
-              return `${prefix}${xScale(point.time)},${yScale(point.accuracy)}`;
+              return `${prefix}${xScale(point.time)},${yScale(point.value)}`;
             })
             .join(' ');
 
           return (
             <g key={key}>
-              <path d={pathD} className="chart-line" stroke={`url(#${gradientId})`} />
-
-              {points.map(point => (
-                <g key={`${key}-point-${point.time}`}>
-                  <circle
-                    cx={xScale(point.time)}
-                    cy={yScale(point.accuracy)}
-                    r={4}
-                    className="chart-point"
-                    style={{ fill: color }}
-                  />
-                  <title>
-                    {`${tooltipLabel}: ${point.accuracy.toFixed(1)}% at ${formatTime(point.time)} (${point.hits}/${point.total || '0'})`}
-                  </title>
-                </g>
-              ))}
+              <path d={pathD} className="chart-line" stroke={color} strokeWidth="2" fill="none" />
+              {/* 그라데이션 영역 채우기 (선택적) */}
+              <path 
+                d={`${pathD} L${xScale(validPoints[validPoints.length-1].time)},${height-padding} L${xScale(validPoints[0].time)},${height-padding} Z`} 
+                fill={`url(#${gradientId})`} 
+                stroke="none"
+              />
             </g>
           );
         })}
       </svg>
-      <div className="chart-legend" aria-label="Accuracy legend">
+      <div className="chart-legend" aria-label="Performance legend">
         {activeSeries.map(({ key, label, color }) => (
           <div key={key} className="legend-item">
             <span className="legend-swatch" style={{ backgroundColor: color }} aria-hidden />
@@ -237,7 +250,7 @@ const AccuracyLineChart = ({ series, duration }: { series: AccuracySeriesConfig[
         ))}
       </div>
       <div className="chart-caption">
-        Accuracy shown as cumulative percentages over time for targets hit, gaze tracking presence, and mouse tracking.
+        Shows the average distance error (lower is better) and synchronization over time.
       </div>
     </div>
   );
@@ -315,75 +328,35 @@ const ResultsPage = () => {
   const heatmapContainerRef = useRef<HTMLDivElement | null>(null);
   const participantLabel = user?.email ?? user?.displayName ?? user?.uid;
 
-  const accuracySeries = useMemo(
-    () => (
-      sessionData
-        ? generateCumulativeSeries(
-            sessionData.rawData,
-            sessionData.duration,
-            point => point.targetHit,
-            point => point.targetId !== null,
-          )
-        : []
-    ),
-    [sessionData],
-  );
+  const performanceSeries = useMemo<SeriesConfig[]>(() => {
+    if (!sessionData) return [];
 
-  const gazeAccuracySeries = useMemo(
-    () => (
-      sessionData
-        ? generateCumulativeSeries(
-            sessionData.rawData,
-            sessionData.duration,
-            point => point.gazeX !== null && point.gazeY !== null,
-          )
-        : []
-    ),
-    [sessionData],
-  );
+    const timeSeries = generateErrorTimeSeries(sessionData.rawData, sessionData.duration);
 
-  const mouseAccuracySeries = useMemo(
-    () => (
-      sessionData
-        ? generateCumulativeSeries(
-            sessionData.rawData,
-            sessionData.duration,
-            point => point.mouseX !== null && point.mouseY !== null,
-          )
-        : []
-    ),
-    [sessionData],
-  );
-
-  const combinedAccuracySeries = useMemo<AccuracySeriesConfig[]>(
-    () => [
+    return [
       {
-        key: 'target-accuracy',
-        label: 'Target Accuracy',
-        color: '#7a5ff5',
-        gradientId: 'line-accuracy',
-        points: accuracySeries,
-        tooltipLabel: 'Target Accuracy',
+        key: 'gaze-error',
+        label: 'Gaze Error',
+        color: '#4ecdc4', // Teal
+        gradientId: 'grad-gaze',
+        points: timeSeries.map(p => ({ time: p.time, value: p.gazeError })),
       },
       {
-        key: 'gaze-accuracy',
-        label: 'Gaze Accuracy',
-        color: '#4ecdc4',
-        gradientId: 'line-gaze',
-        points: gazeAccuracySeries,
-        tooltipLabel: 'Gaze Accuracy',
+        key: 'mouse-error',
+        label: 'Mouse Error',
+        color: '#ffb86c', // Orange
+        gradientId: 'grad-mouse',
+        points: timeSeries.map(p => ({ time: p.time, value: p.mouseError })),
       },
       {
-        key: 'mouse-accuracy',
-        label: 'Mouse Accuracy',
-        color: '#ffb86c',
-        gradientId: 'line-mouse',
-        points: mouseAccuracySeries,
-        tooltipLabel: 'Mouse Accuracy',
+        key: 'synchronization',
+        label: 'Synchronization',
+        color: '#7a5ff5', // Purple
+        gradientId: 'grad-sync',
+        points: timeSeries.map(p => ({ time: p.time, value: p.synchronization })),
       },
-    ],
-    [accuracySeries, gazeAccuracySeries, mouseAccuracySeries],
-  );
+    ];
+  }, [sessionData]);
 
   const { heatmapPoints, baseScreenWidth, baseScreenHeight } = useMemo(() => {
     if (!sessionData) {
@@ -794,10 +767,10 @@ const ResultsPage = () => {
         <section className="viz-section">
           <h2>Session Visualizations</h2>
           <div className="viz-grid">
-            {/* Accuracy Over Time */}
+            {/* Performance Trends Chart (UPDATED) */}
             <div className="viz-card">
-              <h3>Accuracy Over Time</h3>
-              <AccuracyLineChart series={combinedAccuracySeries} duration={sessionData.duration} />
+              <h3>Performance Trends (Error & Sync)</h3>
+              <PerformanceLineChart series={performanceSeries} duration={sessionData.duration} />
             </div>
 
             {/* Gaze Heatmap */}
