@@ -21,6 +21,7 @@ const CalibrationPage = () => {
     isValidationSuccessful,
     validationSequence,
     startSession,
+    stopSession,
     handleCalibrationComplete,
     quality,
     setQuality,
@@ -31,6 +32,13 @@ const CalibrationPage = () => {
     handleCalStage3Complete,
   } = useWebgazer();
   const lastSequenceRef = useRef(validationSequence);
+
+  useEffect(() => {
+    return () => {
+      console.log('🧹 CalibrationPage unmounting - stopping WebGazer');
+      stopSession();
+    };
+  }, [stopSession]);
 
   useEffect(() => {
     if (

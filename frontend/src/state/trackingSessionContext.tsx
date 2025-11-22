@@ -21,6 +21,7 @@ export interface CalibrationResult {
   validationError: number | null;
   completedAt?: string;
 }
+
 export interface TrainingDataPoint {
   timestamp: number;
   gazeX: number | null;
@@ -29,8 +30,8 @@ export interface TrainingDataPoint {
   mouseY: number | null;
   targetHit: boolean;
   targetId: string | null;
-  targetX: number | null;  // ✅ ADD THIS
-  targetY: number | null;  // ✅ ADD THIS
+  targetX: number | null;
+  targetY: number | null;
 }
 
 export interface TrainingSessionSummary {
@@ -78,50 +79,8 @@ export interface SaveSurveyAndConsentPayload {
 
 const STORAGE_KEY = 'trackingSessionState';
 
-const defaultSessions: TrainingSessionSummary[] = [
-  {
-    id: 'mock-1',
-    date: '2025-11-14T00:00:00.000Z',
-    duration: 60,
-    score: 42,
-    accuracy: 85.5,
-    targetsHit: 42,
-    totalTargets: 49,
-    avgReactionTime: 245,
-    gazeAccuracy: 78,
-    mouseAccuracy: 92,
-    csvData: '',
-    rawData: [],
-  },
-  {
-    id: 'mock-2',
-    date: '2025-11-13T00:00:00.000Z',
-    duration: 60,
-    score: 38,
-    accuracy: 78.2,
-    targetsHit: 38,
-    totalTargets: 48,
-    avgReactionTime: 268,
-    gazeAccuracy: 74,
-    mouseAccuracy: 89,
-    csvData: '',
-    rawData: [],
-  },
-  {
-    id: 'mock-3',
-    date: '2025-11-12T00:00:00.000Z',
-    duration: 60,
-    score: 40,
-    accuracy: 82.1,
-    targetsHit: 40,
-    totalTargets: 47,
-    avgReactionTime: 252,
-    gazeAccuracy: 81,
-    mouseAccuracy: 90,
-    csvData: '',
-    rawData: [],
-  },
-];
+// ✅ FIXED: Empty array instead of mock data
+const defaultSessions: TrainingSessionSummary[] = [];
 
 const createDefaultState = (): TrackingSessionState => {
   const sessions = defaultSessions.map(session => ({
