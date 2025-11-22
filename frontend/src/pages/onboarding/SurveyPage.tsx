@@ -1,6 +1,10 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTrackingSession, SurveyResponses } from '../../state/trackingSessionContext';
+import {
+  useTrackingSession,
+  SurveyResponses,
+  saveSurveyAndConsent,
+} from '../../state/trackingSessionContext';
 import {
   EligibilityChecklist,
   GamePreferenceSelector,
@@ -17,16 +21,19 @@ import {
   surveyGameOptions,
   validateSurveyResponses,
 } from '../../features/onboarding/survey';
+import { useAuth } from '../../state/authContext';
 import './SurveyPage.css';
 
 const SurveyPage = () => {
   const navigate = useNavigate();
-  const { surveyResponses, setSurveyResponses } = useTrackingSession();
+  const { user } = useAuth();
+  const { surveyResponses, setSurveyResponses, activeSession } = useTrackingSession();
   const [formData, setFormData] = useState<SurveyResponses>(
     surveyResponses ?? loadSurveyFromSession() ?? defaultSurveyResponses,
   );
   const [error, setError] = useState<string | null>(null);
   const [storageError, setStorageError] = useState<string | null>(null);
+  const [cloudError, setCloudError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -121,6 +128,7 @@ const SurveyPage = () => {
     event.preventDefault();
     setError(null);
     setStorageError(null);
+    setCloudError(null);
 
     const validationMessage = validateSurveyResponses(formData);
     if (validationMessage) {
@@ -131,22 +139,56 @@ const SurveyPage = () => {
     setIsSubmitting(true);
 
     try {
+      const sessionId = activeSession?.id ?? null;
+      const uid = user?.uid ?? null;
+
       let submissionFailed = false;
       try {
-        await submitSurveyResponses(formData);
+        await submitSurveyResponses(formData, { sessionId, uid });
       } catch (submissionError) {
         submissionFailed = true;
         console.warn('Survey submission failed, proceeding to next step:', submissionError);
       }
 
       setSurveyResponses(formData);
-      clearSurveyDraft();
+
+      if (user) {
+        await saveSurveyAndConsent({ uid: user.uid, surveyResponses: formData });
+        clearSurveyDraft();
+      } else {
+        throw new Error('사용자 정보를 불러올 수 없습니다. 다시 로그인 후 시도해주세요.');
+      }
 
       if (submissionFailed) {
         alert('백엔드 API 호출에 실패했지만 데모 모드로 다음 단계로 이동합니다.');
       }
 
       navigate('/onboarding/consent');
+    } catch (cloudSaveError) {
+      console.error('Failed to persist survey to Firestore', cloudSaveError);
+      setCloudError(
+        '설문 응답을 클라우드에 저장하지 못했습니다. 네트워크 연결을 확인한 뒤 재시도해주세요.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRetryCloudSave = async () => {
+    if (!user) {
+      setCloudError('로그인 세션을 확인할 수 없습니다. 다시 로그인한 뒤 시도해주세요.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await saveSurveyAndConsent({ uid: user.uid, surveyResponses: formData });
+      clearSurveyDraft();
+      setCloudError(null);
+      navigate('/onboarding/consent');
+    } catch (retryError) {
+      console.error('Retrying survey save failed', retryError);
+      setCloudError('여전히 저장되지 않았습니다. 잠시 후 다시 시도하거나 지원팀에 문의해주세요.');
     } finally {
       setIsSubmitting(false);
     }
@@ -319,12 +361,12 @@ const SurveyPage = () => {
                     name="selfAssessment"
                     type="range"
                     min={1}
-                    max={7}
+                    max={10}
                     step={1}
                     value={formData.selfAssessment}
                     onChange={handleGeneralChange}
                   />
-                  <span>(7)</span>
+                  <span>(10)</span>
                   <strong>선택: {formData.selfAssessment}</strong>
                 </div>
               </label>
@@ -333,6 +375,30 @@ const SurveyPage = () => {
             {(error || storageError) && (
               <div className="form-error" role="alert">
                 {error ?? storageError}
+              </div>
+            )}
+
+            {cloudError && (
+              <div className="cloud-toast" role="alert">
+                <div className="cloud-toast__message">{cloudError}</div>
+                <div className="cloud-toast__actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={handleRetryCloudSave}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? '재시도 중...' : '클라우드에 다시 저장'}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => setCloudError(null)}
+                    disabled={isSubmitting}
+                  >
+                    닫기
+                  </button>
+                </div>
               </div>
             )}
 

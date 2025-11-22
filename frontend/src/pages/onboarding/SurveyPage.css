@@ -246,6 +246,28 @@ legend {
   color: #5cf39f;
 }
 
+.cloud-toast {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 99, 99, 0.45);
+  background: rgba(255, 99, 99, 0.12);
+  color: #ffd7d7;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cloud-toast__message {
+  font-weight: 600;
+}
+
+.cloud-toast__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 720px) {
   .survey-header {
     flex-direction: column;

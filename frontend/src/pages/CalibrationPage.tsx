@@ -21,6 +21,7 @@ const CalibrationPage = () => {
     isValidationSuccessful,
     validationSequence,
     startSession,
+    stopSession,
     handleCalibrationComplete,
     quality,
     setQuality,
@@ -31,6 +32,17 @@ const CalibrationPage = () => {
     handleCalStage3Complete,
   } = useWebgazer();
   const lastSequenceRef = useRef(validationSequence);
+  const isNavigatingToTraining = useRef(false);
+
+   useEffect(() => {
+     return () => {
+       if (!isNavigatingToTraining.current) {
+         stopSession(); // Only stop if NOT going to training
+       }
+     };
+   }, [stopSession]);
+
+
 
   useEffect(() => {
     if (
@@ -43,6 +55,7 @@ const CalibrationPage = () => {
       saveCalibrationResult({
         status: 'validated',
         validationError,
+        validationStdDev: gazeStability,
         completedAt: new Date().toISOString(),
       });
     }
@@ -50,8 +63,15 @@ const CalibrationPage = () => {
     isValidationSuccessful,
     validationSequence,
     validationError,
+    gazeStability,
     saveCalibrationResult,
   ]);
+
+  const handleProceedToTraining = () => {
+     isNavigatingToTraining.current = true; // Set flag
+     window.webgazer?.showPredictionPoints(false);
+     navigate('/training');
+   };
 
   const renderContent = () => {
     if (!isReady) {
@@ -173,7 +193,8 @@ const CalibrationPage = () => {
               gazeStability={gazeStability}
               onRecalibrate={handleRecalibrate}
               canProceed={isValidationSuccessful}
-              onProceed={() => navigate('/training')}
+              onProceed={handleProceedToTraining}  
+              
             />
           </div>
         );

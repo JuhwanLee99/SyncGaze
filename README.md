@@ -21,6 +21,9 @@ npm run dev            # start Vite dev server
 npm run build          # type-check and create a production bundle
 npm run preview        # preview the production build
 ```
+Copy `frontend/.env.example` to `frontend/.env` and populate it with your Firebase project keys before starting Vite. When you
+change any `VITE_FIREBASE_*` value make sure to restart the dev server so that the updated environment variables are injected
+into the client bundle.
 
 ### Testing workflow
 

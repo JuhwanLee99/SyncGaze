@@ -61,6 +61,8 @@ const convertTrainingData = (data: TrainingDataPoint[]): SessionExportRawDatum[]
   data.map((point, index) => ({
     timestamp: point.timestamp,
     taskId: point.targetId ?? index + 1,
+    targetX: point.targetX,  // ✅ ADD THIS
+    targetY: point.targetY,  // ✅ ADD THIS
     gazeX: point.gazeX,
     gazeY: point.gazeY,
     mouseX: point.mouseX,
@@ -84,6 +86,10 @@ export const serializeSessionToCsv = ({
   taskResults,
   rawData,
 }: SessionExportInput): string => {
+  const resolvedScreenSize = screenSize
+    ?? session.screenSize
+    ?? (isBrowser ? { width: window.innerWidth, height: window.innerHeight } : null);
+
   const participantMeta = [
     '# --- Participant Metadata ---',
     `# Participant Label: ${participantLabel ?? 'N/A'}`,
@@ -117,8 +123,9 @@ export const serializeSessionToCsv = ({
     '# --- System & Calibration ---',
     `# Calibration Status: ${calibrationResult?.status ?? 'not-started'}`,
     `# Validation Error (px): ${formatNumber(calibrationResult?.validationError ?? null)}`,
+    `# Validation Avg. StdDev (px): ${formatNumber(calibrationResult?.validationStdDev ?? null)}`,
     `# Calibration Completed At: ${calibrationResult?.completedAt ?? 'N/A'}`,
-    `# Screen Size: ${screenSize ? `${screenSize.width}x${screenSize.height}` : 'N/A'}`,
+    `# Screen Size: ${resolvedScreenSize ? `${resolvedScreenSize.width}x${resolvedScreenSize.height}` : 'N/A'}`,
   ];
 
   if (trackerMeta) {
@@ -214,36 +221,94 @@ export interface CsvUploadOptions {
   endpoint?: string;
   fetchImpl?: typeof fetch;
   headers?: Record<string, string>;
+  sessionId?: string;
+  idToken?: string;
+  retryCount?: number;
+  retryDelayMs?: number;
 }
 
 export interface CsvUploadResult {
   url?: string;
+  downloadUrl?: string;
+  storagePath?: string;
+  sessionId?: string;
   message?: string;
   [key: string]: unknown;
 }
 
+const apiBase =
+  typeof import.meta !== 'undefined'
+    ? import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL || null
+    : null;
+
+const normalizeEndpoint = (base: string | null, path: string) => {
+  if (!base) return path;
+  return `${base.replace(/\/$/, '')}${path}`;
+};
+
+const DEFAULT_UPLOAD_ENDPOINT =
+  (typeof import.meta !== 'undefined' ? import.meta.env.VITE_FIREBASE_UPLOAD_ENDPOINT : null) ||
+  normalizeEndpoint(apiBase, '/api/upload-csv');
+
 export const uploadCsvToEndpoint = async (
   csvContent: string,
-  { endpoint = '/api/upload-csv', fetchImpl = fetch, headers }: CsvUploadOptions = {},
+  {
+    endpoint = DEFAULT_UPLOAD_ENDPOINT,
+    fetchImpl = fetch,
+    headers,
+    sessionId,
+    idToken,
+    retryCount = 2,
+    retryDelayMs = 600,
+  }: CsvUploadOptions = {},
 ): Promise<CsvUploadResult> => {
-  const response = await fetchImpl(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'text/plain;charset=utf-8;',
-      ...headers,
-    },
-    body: csvContent,
-  });
+  const attempts = Math.max(1, retryCount + 1);
+  let lastError: unknown;
+  const resolvedEndpoint = endpoint;
 
-  const contentType = response.headers.get('content-type') ?? '';
-  const payload = contentType.includes('application/json') ? await response.json() : await response.text();
-
-  if (!response.ok) {
-    const message = typeof payload === 'string' ? payload : 'Failed to upload CSV data.';
-    throw new Error(message);
+  if (!resolvedEndpoint) {
+    throw new Error('CSV upload endpoint is not configured.');
   }
 
-  return typeof payload === 'string' ? { message: payload } : payload;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetchImpl(resolvedEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/csv;charset=utf-8;',
+          ...(sessionId ? { 'X-Session-Id': sessionId } : {}),
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+          ...headers,
+        },
+        body: csvContent,
+      });
+
+      const contentType = response.headers.get('content-type') ?? '';
+      const payload = contentType.includes('application/json')
+        ? await response.json()
+        : await response.text();
+
+      if (!response.ok) {
+        const message = typeof payload === 'string' ? payload : payload?.message;
+        const statusDetails = `${response.status} ${response.statusText}`.trim();
+        const errorMessage = message || 'Failed to upload CSV data to Firebase endpoint.';
+        throw new Error(statusDetails ? `${errorMessage} (${statusDetails})` : errorMessage);
+      }
+
+      return typeof payload === 'string' ? { message: payload } : payload;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts - 1) {
+        await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+      }
+    }
+  }
+
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+
+  throw new Error('Unknown error while uploading CSV data.');
 };
 
 export interface ExportSessionOptions {
