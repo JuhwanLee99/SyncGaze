@@ -13,6 +13,9 @@ import ResearchConsentPage from './pages/onboarding/ResearchConsentPage';
 import { ReactElement } from 'react';
 import { useAuth } from './state/authContext';
 
+//연구 감사인사용 페이지
+import ThankYouPage from './pages/onboarding/ThankYouPage';
+
 const RouteLoader = () => (
   <div className="route-loader" role="status" aria-live="polite">
     <div className="route-loader__spinner" aria-hidden="true" />
@@ -117,6 +120,15 @@ const AppRouter = () => {
           element={(
             <ProtectedRoute>
               <ResearchConsentPage />
+            </ProtectedRoute>
+          )}
+        />
+
+        <Route
+          path="/thank-you"
+          element={(
+            <ProtectedRoute>
+              <ThankYouPage />
             </ProtectedRoute>
           )}
         />
