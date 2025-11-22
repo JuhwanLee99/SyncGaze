@@ -34,15 +34,6 @@ type AccuracyPoint = {
   total: number;
 };
 
-type AccuracySeriesConfig = {
-  key: string;
-  label: string;
-  color: string;
-  gradientId: string;
-  points: AccuracyPoint[];
-  tooltipLabel: string;
-};
-
 type SeriesPoint = {
   time: number;
   value: number | null;
@@ -58,64 +49,16 @@ type SeriesConfig = {
 
 type HeatmapPoint = { x: number; y: number };
 
-const generateCumulativeSeries = (
-  data: TrainingDataPoint[],
-  duration: number,
-  isHit: (point: TrainingDataPoint) => boolean,
-  shouldCount: (point: TrainingDataPoint) => boolean = () => true,
-): AccuracyPoint[] => {
-  if (!data.length) {
-    return [];
-  }
-
-  const sorted = [...data].sort((a, b) => a.timestamp - b.timestamp);
-  const startTime = sorted[0].timestamp;
-  const buckets = new Map<number, { hits: number; total: number }>();
-
-  sorted.forEach(point => {
-    const elapsedSeconds = Math.max(0, Math.floor((point.timestamp - startTime) / 1000));
-    const bucket = buckets.get(elapsedSeconds) ?? { hits: 0, total: 0 };
-    if (shouldCount(point)) {
-      bucket.total += 1;
-    }
-    if (isHit(point)) {
-      bucket.hits += 1;
-    }
-    buckets.set(elapsedSeconds, bucket);
-  });
-
-  const bucketSeconds = Array.from(buckets.keys());
-  const lastBucket = bucketSeconds.length ? Math.max(...bucketSeconds) : 0;
-  const maxSeconds = Math.max(duration ?? 0, lastBucket);
-
-  let runningHits = 0;
-  let runningTotal = 0;
-  const series: AccuracyPoint[] = [];
-
-  for (let second = 0; second <= maxSeconds; second += 1) {
-    const bucket = buckets.get(second);
-    if (bucket) {
-      runningHits += bucket.hits;
-      runningTotal += bucket.total;
-    }
-
-    const currentAccuracy = runningTotal
-      ? (runningHits / runningTotal) * 100
-      : series.at(-1)?.accuracy ?? 0;
-
-    series.push({
-      time: second,
-      accuracy: currentAccuracy,
-      hits: runningHits,
-      total: runningTotal,
-    });
-  }
-
-  return series;
-};
-
-// --- PerformanceLineChart Component (UPDATED) ---
-const PerformanceLineChart = ({ series, duration }: { series: SeriesConfig[]; duration: number }) => {
+// --- PerformanceLineChart Component (UPDATED with Hit Markers) ---
+const PerformanceLineChart = ({ 
+  series, 
+  duration,
+  hitTimes = [] // NEW: 명중 시점 배열
+}: { 
+  series: SeriesConfig[]; 
+  duration: number;
+  hitTimes?: number[];
+}) => {
   const activeSeries = series.filter(s => s.points.some(p => p.value !== null));
 
   if (!activeSeries.length) {
@@ -183,6 +126,31 @@ const PerformanceLineChart = ({ series, duration }: { series: SeriesConfig[]; du
           />
         ))}
 
+        {/* NEW: Hit Markers (명중 시점 표시) */}
+        {hitTimes.map((time, idx) => (
+          <g key={`hit-${idx}`}>
+            {/* 세로 점선 */}
+            <line
+              x1={xScale(time)}
+              x2={xScale(time)}
+              y1={padding}
+              y2={height - padding}
+              stroke="rgba(127, 9, 9, 0.79)"
+              strokeWidth="1.5"
+              strokeDasharray="4 4"
+            />
+            {/* X축 위의 마커 */}
+            <circle
+              cx={xScale(time)}
+              cy={height - padding}
+              r={3}
+              fill="#871212ff" // 명중
+              opacity="0.8"
+            />
+            <title>Target Hit at {time.toFixed(1)}s</title>
+          </g>
+        ))}
+
         {/* Axis labels */}
         {xTickValues.map(tick => (
           <text key={`xlabel-${tick}`} x={xScale(tick)} y={height - padding + 24} className="chart-label" textAnchor="middle">
@@ -215,7 +183,7 @@ const PerformanceLineChart = ({ series, duration }: { series: SeriesConfig[]; du
           Error (px)
         </text>
 
-        {/* Data lines & points */}
+        {/* Data lines */}
         {activeSeries.map(({ key, points, gradientId, color }) => {
           // null 값을 건너뛰고 유효한 구간만 그림
           const validPoints = points.filter(p => p.value !== null) as { time: number, value: number }[];
@@ -248,9 +216,14 @@ const PerformanceLineChart = ({ series, duration }: { series: SeriesConfig[]; du
             <span className="legend-label">{label}</span>
           </div>
         ))}
+        {/* 명중 마커 범례 추가 */}
+        <div className="legend-item">
+          <span className="legend-swatch" style={{ backgroundColor: '#871212ff', width: 8, height: 8, borderRadius: '50%' }} aria-hidden />
+          <span className="legend-label">Hit Moment</span>
+        </div>
       </div>
       <div className="chart-caption">
-        Shows the average distance error (lower is better) and synchronization over time.
+        Lower values indicate better tracking accuracy. Markers indicate when targets were hit.
       </div>
     </div>
   );
@@ -328,6 +301,7 @@ const ResultsPage = () => {
   const heatmapContainerRef = useRef<HTMLDivElement | null>(null);
   const participantLabel = user?.email ?? user?.displayName ?? user?.uid;
 
+  // --- NEW: Performance Series Data Generation ---
   const performanceSeries = useMemo<SeriesConfig[]>(() => {
     if (!sessionData) return [];
 
@@ -356,6 +330,16 @@ const ResultsPage = () => {
         points: timeSeries.map(p => ({ time: p.time, value: p.synchronization })),
       },
     ];
+  }, [sessionData]);
+
+  // --- NEW: Hit Times Calculation ---
+  const hitTimes = useMemo(() => {
+    if (!sessionData?.rawData.length) return [];
+    const sorted = [...sessionData.rawData].sort((a, b) => a.timestamp - b.timestamp);
+    const startTime = sorted[0].timestamp;
+    return sorted
+      .filter(d => d.targetHit)
+      .map(d => (d.timestamp - startTime) / 1000);
   }, [sessionData]);
 
   const { heatmapPoints, baseScreenWidth, baseScreenHeight } = useMemo(() => {
@@ -770,7 +754,11 @@ const ResultsPage = () => {
             {/* Performance Trends Chart (UPDATED) */}
             <div className="viz-card">
               <h3>Performance Trends (Error & Sync)</h3>
-              <PerformanceLineChart series={performanceSeries} duration={sessionData.duration} />
+              <PerformanceLineChart 
+                series={performanceSeries} 
+                duration={sessionData.duration} 
+                hitTimes={hitTimes}
+              />
             </div>
 
             {/* Gaze Heatmap */}
