@@ -647,6 +647,16 @@ const ResultsPage = () => {
       <main className="results-main">
         {/* Key Metrics Section - UPDATED */}
         <section className="metrics-section">
+          {/* --- 상세 페이지 이동 버튼 --- */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+            <button 
+              className="secondary-button" 
+              onClick={() => handleOpenDetailed()}
+              style={{ fontSize: '0.9rem', padding: '8px 16px' }}
+            >
+              View Detailed Analysis &rarr;
+            </button>
+          </div>
           <h2>Performance Overview</h2>
           <div className="metrics-grid">
             {/* 1. Targets Hit */}
