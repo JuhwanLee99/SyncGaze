@@ -13,7 +13,8 @@ import { exportSessionData } from '../utils/sessionExport';
 import { useWebgazer } from '../hooks/tracking/useWebgazer';
 import { useAuth } from '../state/authContext';
 import { persistLatestSession } from '../utils/resultsStorage';
-import { calculatePerformanceAnalytics } from '../utils/analytics';
+// Analytics 인터페이스와 함수를 utils에서 import (ResultsPage 내의 중복 정의 제거)
+import { calculatePerformanceAnalytics, PerformanceAnalytics } from '../utils/analytics';
 
 interface Analytics {
   totalTargets: number;
@@ -301,7 +302,7 @@ const ResultsPage = () => {
   const [sessionData, setSessionData] = useState<TrainingSessionSummary | null>(sessionToDisplay);
   // 3. analytics를 useMemo로 변경 (useState 제거)
   // 이렇게 하면 sessionData가 있을 때 즉시 계산되므로 "Loading..." 화면에 갇히지 않음
-  const analytics = useMemo(() => {
+  const analytics = useMemo<PerformanceAnalytics | null>(() => {
     return sessionData ? calculatePerformanceAnalytics(sessionData.rawData) : null;
   }, [sessionData]);
 
@@ -687,36 +688,27 @@ const ResultsPage = () => {
 
       {/* Main Content */}
       <main className="results-main">
-        {/* Key Metrics */}
+        {/* Key Metrics Section - UPDATED */}
         <section className="metrics-section">
           <h2>Performance Overview</h2>
           <div className="metrics-grid">
+            {/* 1. Targets Hit */}
             <button
               type="button"
               className="metric-card actionable highlight"
-              onClick={() => handleOpenDetailed('accuracy')}
-            >
-              <div className="metric-icon">🎯</div>
-              <div className="metric-content">
-                <div className="metric-value">{analytics.accuracy.toFixed(1)}%</div>
-                <div className="metric-label">Accuracy</div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className="metric-card actionable"
               onClick={() => handleOpenDetailed('targets')}
             >
-              <div className="metric-icon">✓</div>
+              <div className="metric-icon">🎯</div>
               <div className="metric-content">
                 <div className="metric-value">
                   {analytics.targetsHit}/{analytics.totalTargets}
                 </div>
                 <div className="metric-label">Targets Hit</div>
+                <div className="metric-desc">전체 타겟 대비 명중 횟수</div>
               </div>
             </button>
 
+            {/* 2. Avg Reaction Time (Mouse) */}
             <button
               type="button"
               className="metric-card actionable"
@@ -727,10 +719,12 @@ const ResultsPage = () => {
                 <div className="metric-value">
                   {analytics.avgReactionTime.toFixed(0)}ms
                 </div>
-                <div className="metric-label">Avg Reaction Time</div>
+                <div className="metric-label">Avg Reaction</div>
+                <div className="metric-desc">타겟 등장 후 클릭까지 평균 시간</div>
               </div>
             </button>
 
+            {/* 3. Gaze Reaction Time (Eye) - NEW */}
             <button
               type="button"
               className="metric-card actionable"
@@ -738,20 +732,59 @@ const ResultsPage = () => {
             >
               <div className="metric-icon">👁️</div>
               <div className="metric-content">
-                <div className="metric-value">{analytics.gazeAccuracy.toFixed(1)}%</div>
-                <div className="metric-label">Gaze Accuracy</div>
+                <div className="metric-value">
+                  {analytics.avgGazeReactionTime.toFixed(0)}ms
+                </div>
+                <div className="metric-label">Gaze Reaction</div>
+                <div className="metric-desc">타겟 등장 후 시선 도달 시간</div>
               </div>
             </button>
 
+            {/* 4. Gaze-Aim Latency - NEW */}
+            <button
+              type="button"
+              className="metric-card actionable"
+              onClick={() => handleOpenDetailed('reaction')}
+            >
+              <div className="metric-icon">⏱️</div>
+              <div className="metric-content">
+                <div className="metric-value">
+                  {analytics.gazeAimLatency.toFixed(0)}ms
+                </div>
+                <div className="metric-label">Gaze-Aim Latency</div>
+                <div className="metric-desc">시선 포착 후 클릭까지의 지연 시간</div>
+              </div>
+            </button>
+
+            {/* 5. Errors (Gaze / Mouse) - UPDATED from Accuracy */}
+            <button
+              type="button"
+              className="metric-card actionable"
+              onClick={() => handleOpenDetailed('accuracy')}
+            >
+              <div className="metric-icon">📏</div>
+              <div className="metric-content">
+                <div className="metric-value" style={{ fontSize: '1.5rem' }}>
+                   G: {analytics.gazeErrorAtHit.toFixed(0)}px / M: {analytics.mouseErrorAtHit.toFixed(0)}px
+                </div>
+                <div className="metric-label">Hit Error (Gaze/Mouse)</div>
+                <div className="metric-desc">명중 순간 타겟 중심과의 거리 오차</div>
+              </div>
+            </button>
+
+            {/* 6. Synchronization - NEW */}
             <button
               type="button"
               className="metric-card actionable"
               onClick={() => handleOpenDetailed('mouse')}
             >
-              <div className="metric-icon">🖱️</div>
+              <div className="metric-icon">🔗</div>
               <div className="metric-content">
-                <div className="metric-value">{analytics.mouseAccuracy.toFixed(1)}%</div>
-                <div className="metric-label">Mouse Accuracy</div>
+                <div className="metric-value">
+                  {analytics.synchronization.toFixed(0)}px
+                </div>
+                <div className="metric-label">Synchronization</div>
+                <div className="metric-desc">시선과 마우스 커서 간의 평균 거리</div>
               </div>
             </button>
           </div>

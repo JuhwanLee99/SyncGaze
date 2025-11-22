@@ -8,6 +8,7 @@ import {
   useTrackingSession,
 } from '../state/trackingSessionContext';
 import { loadStoredCalibration, loadStoredSession, persistLatestSession } from '../utils/resultsStorage';
+import { calculatePerformanceAnalytics } from '../utils/analytics';
 
 type FocusMetric = 'accuracy' | 'targets' | 'reaction' | 'gaze' | 'mouse';
 
@@ -40,27 +41,16 @@ const median = (values: number[]) => {
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 };
 
-const calculateAnalytics = (data: TrainingDataPoint[]) => {
-  if (!data.length) {
-    return null;
-  }
-  const hits = data.filter(d => d.targetHit);
-  const totalTargets = data.filter(d => d.targetId !== null).length || hits.length;
-  const reactionTimes = hits.map(d => d.timestamp);
-  const avgReactionTime = reactionTimes.length > 0
-    ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length
-    : 0;
-
-  const dataWithGaze = data.filter(d => d.gazeX !== null && d.gazeY !== null);
-  const dataWithMouse = data.filter(d => d.mouseX !== null && d.mouseY !== null);
+// 기존 calculateLegacyAnalytics 제거하고 커버리지 계산용 함수로 대체
+const calculateCoverage = (data: TrainingDataPoint[]) => {
+  if (!data.length) return { gaze: 0, mouse: 0 };
+  
+  const gazeSamples = data.filter(d => d.gazeX !== null && d.gazeY !== null).length;
+  const mouseSamples = data.filter(d => d.mouseX !== null && d.mouseY !== null).length;
 
   return {
-    accuracy: totalTargets > 0 ? (hits.length / totalTargets) * 100 : 0,
-    targetsHit: hits.length,
-    totalTargets,
-    avgReactionTime,
-    gazeAccuracy: (dataWithGaze.length / data.length) * 100,
-    mouseAccuracy: (dataWithMouse.length / data.length) * 100,
+    gaze: (gazeSamples / data.length) * 100,
+    mouse: (mouseSamples / data.length) * 100,
   };
 };
 
@@ -142,26 +132,28 @@ const DetailedResultsPage = () => {
     }
   }, [calibrationResult]);
 
-  const analytics = useMemo(() => sessionData ? calculateAnalytics(sessionData.rawData) : null, [sessionData]);
+  // ResultsPage와 동일한 Analytics 사용
+  const analytics = useMemo(() => sessionData ? calculatePerformanceAnalytics(sessionData.rawData) : null, [sessionData]);
+  
+  // Coverage는 별도 계산
+  const coverage = useMemo(() => sessionData ? calculateCoverage(sessionData.rawData) : null, [sessionData]);
+
   const gazeError = useMemo(() => sessionData ? calculateErrorStats(sessionData.rawData, 'gaze') : null, [sessionData]);
   const mouseError = useMemo(() => sessionData ? calculateErrorStats(sessionData.rawData, 'mouse') : null, [sessionData]);
   const hitIntervals = useMemo(() => sessionData ? calculateHitIntervals(sessionData.rawData) : null, [sessionData]);
 
   const dataQuality = useMemo(() => {
-    if (!sessionData) return null;
+    if (!sessionData || !analytics || !coverage) return null;
     const total = sessionData.rawData.length || 1;
     const withTargets = sessionData.rawData.filter(d => d.targetX !== null && d.targetY !== null).length;
-    const gazeSamples = sessionData.rawData.filter(d => d.gazeX !== null && d.gazeY !== null).length;
-    const mouseSamples = sessionData.rawData.filter(d => d.mouseX !== null && d.mouseY !== null).length;
-    const hits = sessionData.rawData.filter(d => d.targetHit).length;
 
     return {
       withTargetsPct: (withTargets / total) * 100,
-      gazeCoverage: (gazeSamples / total) * 100,
-      mouseCoverage: (mouseSamples / total) * 100,
-      hitRate: analytics ? (hits / (analytics.totalTargets || 1)) * 100 : 0,
+      gazeCoverage: coverage.gaze,
+      mouseCoverage: coverage.mouse,
+      hitRate: analytics.totalTargets > 0 ? (analytics.targetsHit / analytics.totalTargets) * 100 : 0,
     };
-  }, [analytics, sessionData]);
+  }, [analytics, coverage, sessionData]);
 
   const recentSamples = useMemo(() => {
     if (!sessionData) return [];
@@ -183,7 +175,7 @@ const DetailedResultsPage = () => {
 
   const handleBack = () => navigate('/results');
 
-  if (!sessionData || !analytics) {
+  if (!sessionData || !analytics || !coverage) {
     return (
       <div className="detailed-results-page">
         <div className="detail-empty">
@@ -196,6 +188,11 @@ const DetailedResultsPage = () => {
     );
   }
 
+  // 정확도 계산 (안전하게 0으로 나누기 방지)
+  const accuracyPct = analytics.totalTargets > 0 
+    ? (analytics.targetsHit / analytics.totalTargets) * 100 
+    : 0;
+
   return (
     <div className="detailed-results-page">
       <header className="detailed-header">
@@ -207,9 +204,9 @@ const DetailedResultsPage = () => {
           </p>
         </div>
         <div className="header-actions">
-          {calibration?.validationError !== null && (
+          {calibration && calibration.validationError !== null && (
             <div className="pill">
-              Calibration error: {calibration.validationError?.toFixed(1)} px
+              Calibration error: {calibration.validationError.toFixed(1)} px
             </div>
           )}
           <button type="button" className="detail-button ghost" onClick={handleBack}>
@@ -219,30 +216,56 @@ const DetailedResultsPage = () => {
       </header>
 
       <section className="detail-section">
-        <div className="detail-grid">
+        <div className="detail-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+          {/* 1. Accuracy */}
           <div className={`detail-card ${focusMetric === 'accuracy' ? 'focused' : ''}`}>
-            <p className="card-label">Accuracy</p>
-            <p className="card-value">{analytics.accuracy.toFixed(1)}%</p>
+            <p className="card-label">Hit Rate (Accuracy)</p>
+            <p className="card-value">{accuracyPct.toFixed(1)}%</p>
             <p className="card-meta">
               {analytics.targetsHit} / {analytics.totalTargets} targets hit
             </p>
           </div>
+
+          {/* 2. Avg Reaction Time */}
           <div className={`detail-card ${focusMetric === 'reaction' ? 'focused' : ''}`}>
             <p className="card-label">Avg Reaction Time</p>
             <p className="card-value">{analytics.avgReactionTime.toFixed(0)} ms</p>
-            <p className="card-meta">
-              {hitIntervals?.samples ?? 0} intervals tracked
-            </p>
+            <p className="card-meta">Mouse click latency</p>
           </div>
+
+          {/* 3. Gaze Reaction */}
+          <div className={`detail-card ${focusMetric === 'gaze' ? 'focused' : ''}`}>
+            <p className="card-label">Gaze Reaction</p>
+            <p className="card-value">{analytics.avgGazeReactionTime.toFixed(0)} ms</p>
+            <p className="card-meta">Time to first look at target</p>
+          </div>
+
+          {/* 4. Gaze-Aim Latency */}
+           <div className="detail-card">
+            <p className="card-label">Gaze-Aim Latency</p>
+            <p className="card-value">{analytics.gazeAimLatency.toFixed(0)} ms</p>
+            <p className="card-meta">Eye vs Hand delay</p>
+          </div>
+
+           {/* 5. Synchronization */}
+           <div className="detail-card">
+            <p className="card-label">Synchronization</p>
+            <p className="card-value">{analytics.synchronization.toFixed(0)} px</p>
+            <p className="card-meta">Avg distance: Gaze ↔ Mouse</p>
+          </div>
+
+          {/* 6. Gaze Coverage */}
           <div className={`detail-card ${focusMetric === 'gaze' ? 'focused' : ''}`}>
             <p className="card-label">Gaze Samples</p>
-            <p className="card-value">{analytics.gazeAccuracy.toFixed(1)}%</p>
-            <p className="card-meta">Coverage vs total frames</p>
+            <p className="card-value">{coverage.gaze.toFixed(1)}%</p>
+            <p className="card-meta">Tracking coverage</p>
           </div>
+
+          {/* 7. Mouse Coverage */}
           <div className={`detail-card ${focusMetric === 'mouse' ? 'focused' : ''}`}>
             <p className="card-label">Mouse Samples</p>
-            <p className="card-value">{analytics.mouseAccuracy.toFixed(1)}%</p>
-            <p className="card-meta">Coverage vs total frames</p>
+            <p className="card-value">{coverage.mouse.toFixed(1)}%</p>
+            <p className="card-meta">Input coverage</p>
           </div>
         </div>
       </section>
@@ -259,8 +282,13 @@ const DetailedResultsPage = () => {
               <span className="chip">{gazeError?.samples ?? 0} samples</span>
             </div>
             <div className="stat-row">
-              <span>Avg error</span>
+              <span>Avg error (Session)</span>
               <strong>{gazeError ? gazeError.avg.toFixed(1) : '0.0'} px</strong>
+            </div>
+            <div className="stat-row">
+              <span>Error at Hit (Moment)</span>
+              {/* analytics의 gazeErrorAtHit 사용 */}
+              <strong>{analytics.gazeErrorAtHit.toFixed(1)} px</strong>
             </div>
             <div className="stat-row">
               <span>Median / P95</span>
@@ -280,8 +308,13 @@ const DetailedResultsPage = () => {
               <span className="chip">{mouseError?.samples ?? 0} samples</span>
             </div>
             <div className="stat-row">
-              <span>Avg error</span>
+              <span>Avg error (Session)</span>
               <strong>{mouseError ? mouseError.avg.toFixed(1) : '0.0'} px</strong>
+            </div>
+             <div className="stat-row">
+              <span>Error at Hit (Moment)</span>
+              {/* analytics의 mouseErrorAtHit 사용 */}
+              <strong>{analytics.mouseErrorAtHit.toFixed(1)} px</strong>
             </div>
             <div className="stat-row">
               <span>Median / P95</span>
@@ -297,6 +330,7 @@ const DetailedResultsPage = () => {
         </div>
       </section>
 
+      {/* Data Quality 섹션 */}
       <section className="detail-section">
         <div className="section-header">
           <h2>Data Quality & Timing</h2>
@@ -340,6 +374,7 @@ const DetailedResultsPage = () => {
         </div>
       </section>
 
+      {/* Recent Samples 섹션 */}
       <section className="detail-section">
         <div className="section-header">
           <h2>Recent Samples</h2>
