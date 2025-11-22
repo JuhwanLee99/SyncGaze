@@ -96,8 +96,12 @@ const TrainingPage = () => {
       avgReactionTime: metrics.avgReactionTime,
       gazeAccuracy: metrics.gazeAccuracy,
       mouseAccuracy: metrics.mouseAccuracy,
-      rawData: convertedData,
-      csvData: '',
+      screenSize: {
+        width: window.innerWidth,
+        height: window.innerHeight
+      },
+      rawData: convertedData, // Now includes actual collected data
+      csvData: '', // Will be set below
     };
 
     // Generate CSV with all the data
@@ -106,10 +110,7 @@ const TrainingPage = () => {
       surveyResponses,
       consentAccepted,
       calibrationResult,
-      screenSize: {
-        width: window.innerWidth,
-        height: window.innerHeight
-      },
+      screenSize: sessionRecord.screenSize,
       participantLabel: user?.email ?? user?.displayName ?? user?.uid,
     });
 

@@ -86,6 +86,10 @@ export const serializeSessionToCsv = ({
   taskResults,
   rawData,
 }: SessionExportInput): string => {
+  const resolvedScreenSize = screenSize
+    ?? session.screenSize
+    ?? (isBrowser ? { width: window.innerWidth, height: window.innerHeight } : null);
+
   const participantMeta = [
     '# --- Participant Metadata ---',
     `# Participant Label: ${participantLabel ?? 'N/A'}`,
@@ -119,8 +123,9 @@ export const serializeSessionToCsv = ({
     '# --- System & Calibration ---',
     `# Calibration Status: ${calibrationResult?.status ?? 'not-started'}`,
     `# Validation Error (px): ${formatNumber(calibrationResult?.validationError ?? null)}`,
+    `# Validation Avg. StdDev (px): ${formatNumber(calibrationResult?.validationStdDev ?? null)}`,
     `# Calibration Completed At: ${calibrationResult?.completedAt ?? 'N/A'}`,
-    `# Screen Size: ${screenSize ? `${screenSize.width}x${screenSize.height}` : 'N/A'}`,
+    `# Screen Size: ${resolvedScreenSize ? `${resolvedScreenSize.width}x${resolvedScreenSize.height}` : 'N/A'}`,
   ];
 
   if (trackerMeta) {

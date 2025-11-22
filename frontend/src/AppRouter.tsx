@@ -5,6 +5,7 @@ import DashboardPage from './pages/DashboardPage';
 import CalibrationPage from './pages/CalibrationPage';
 import TrainingPage from './pages/TrainingPage';
 import ResultsPage from './pages/ResultsPage';
+import DetailedResultsPage from './pages/DetailedResultsPage';
 
 import TrackerFlowPage from './pages/TrackerFlowPage';
 import SurveyPage from './pages/onboarding/SurveyPage';
@@ -92,6 +93,14 @@ const AppRouter = () => {
           element={(
             <ProtectedRoute>
               <ResultsPage />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/results/detailed"
+          element={(
+            <ProtectedRoute>
+              <DetailedResultsPage />
             </ProtectedRoute>
           )}
         />
