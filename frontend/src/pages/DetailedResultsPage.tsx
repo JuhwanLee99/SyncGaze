@@ -39,6 +39,8 @@ type SeriesConfig = {
   color: string;
   gradientId: string;
   points: SeriesPoint[];
+  fill?: boolean;
+  showPoints?: boolean;
 };
 
 type HeatmapPoint = { x: number; y: number };
@@ -86,18 +88,20 @@ const ZoomControls = ({
 );
 
 // --- PerformanceLineChart Component (UPDATED with filtering) ---
-const PerformanceLineChart = ({ 
-  series, 
+const PerformanceLineChart = ({
+  series,
   duration,
   hitTimes = [],
   zoomLevel = 1,
-  showHitMarkers = true // NEW: 마커 표시 여부 제어
-}: { 
-  series: SeriesConfig[]; 
+  showHitMarkers = true, // NEW: 마커 표시 여부 제어
+  yAxisLabel = 'Error (px)',
+}: {
+  series: SeriesConfig[];
   duration: number;
   hitTimes?: number[];
   zoomLevel?: number;
   showHitMarkers?: boolean;
+  yAxisLabel?: string;
 }) => {
   const activeSeries = series.filter(s => s.points.some(p => p.value !== null));
 
@@ -172,16 +176,27 @@ const PerformanceLineChart = ({
           ))}
 
           <text x={(width + padding) / 2} y={height - 12} className="chart-axis-title" textAnchor="middle">Time (seconds)</text>
-          <text x={16} y={height / 2} className="chart-axis-title" textAnchor="middle" transform={`rotate(-90 16 ${height / 2})`}>Error (px)</text>
+          <text x={16} y={height / 2} className="chart-axis-title" textAnchor="middle" transform={`rotate(-90 16 ${height / 2})`}>
+            {yAxisLabel}
+          </text>
 
-          {activeSeries.map(({ key, points, gradientId, color }) => {
+          {activeSeries.map(({ key, points, gradientId, color, fill = true, showPoints = false }) => {
             const validPoints = points.filter(p => p.value !== null) as { time: number, value: number }[];
-            if (validPoints.length < 2) return null;
+            if (!validPoints.length) return null;
             const pathD = validPoints.map((point, index) => `${index === 0 ? 'M' : 'L'}${xScale(point.time)},${yScale(point.value)}`).join(' ');
             return (
               <g key={key}>
-                <path d={pathD} className="chart-line" stroke={color} strokeWidth="2" fill="none" />
-                <path d={`${pathD} L${xScale(validPoints[validPoints.length-1].time)},${height-padding} L${xScale(validPoints[0].time)},${height-padding} Z`} fill={`url(#${gradientId})`} stroke="none" />
+                {validPoints.length >= 2 && (
+                  <>
+                    <path d={pathD} className="chart-line" stroke={color} strokeWidth="2" fill="none" />
+                    {fill && (
+                      <path d={`${pathD} L${xScale(validPoints[validPoints.length-1].time)},${height-padding} L${xScale(validPoints[0].time)},${height-padding} Z`} fill={`url(#${gradientId})`} stroke="none" />
+                    )}
+                  </>
+                )}
+                {showPoints && validPoints.map(point => (
+                  <circle key={`${key}-${point.time}`} cx={xScale(point.time)} cy={yScale(point.value)} r={3} fill={color} opacity={0.95} />
+                ))}
               </g>
             );
           })}
@@ -279,6 +294,8 @@ const DetailedResultsPage = () => {
 
   const [chartZoom, setChartZoom] = useState(1);
   const [heatmapZoom, setHeatmapZoom] = useState(1);
+  const [rollingZoom, setRollingZoom] = useState(1);
+  const [velocityZoom, setVelocityZoom] = useState(1);
 
   // --- NEW: Metric Visibility State ---
   const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({
@@ -288,8 +305,30 @@ const DetailedResultsPage = () => {
     'hit-moment': true,
   });
 
+  const [rollingVisibility, setRollingVisibility] = useState<Record<string, boolean>>({
+    'rolling-accuracy': true,
+    'rolling-hps': true,
+    'rolling-hits': true,
+  });
+
+  const [velocityVisibility, setVelocityVisibility] = useState<Record<string, boolean>>({
+    'mouse-velocity': true,
+    'reaction-time': true,
+    'velocity-hits': false,
+  });
+
+  const rollingWindowSeconds = 3;
+
   const toggleMetric = (key: string) => {
     setVisibleMetrics(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const toggleRollingMetric = (key: string) => {
+    setRollingVisibility(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const toggleVelocityMetric = (key: string) => {
+    setVelocityVisibility(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const heatmapCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -374,6 +413,161 @@ const DetailedResultsPage = () => {
     const startTime = sorted[0].timestamp;
     return sorted.filter(d => d.targetHit).map(d => (d.timestamp - startTime) / 1000);
   }, [sessionData]);
+
+  const rollingPerformance = useMemo(() => {
+    if (!sessionData?.rawData.length) {
+      return { accuracySeries: [], hpsSeries: [], hitTimes: [] as number[] };
+    }
+
+    const sorted = [...sessionData.rawData].sort((a, b) => a.timestamp - b.timestamp);
+    const startTime = sorted[0].timestamp;
+    const endTime = sorted.at(-1)?.timestamp ?? startTime;
+    const durationSeconds = Math.max(sessionData.duration, Math.ceil((endTime - startTime) / 1000));
+
+    const targetFirstSeen = new Map<string, number>();
+    const hitTimestamps: number[] = [];
+
+    sorted.forEach(point => {
+      if (point.targetId && !targetFirstSeen.has(point.targetId)) {
+        targetFirstSeen.set(point.targetId, point.timestamp);
+      }
+      if (point.targetHit) {
+        hitTimestamps.push(point.timestamp);
+      }
+    });
+
+    const targetFirstList = Array.from(targetFirstSeen.values()).sort((a, b) => a - b);
+    hitTimestamps.sort((a, b) => a - b);
+
+    let targetWindowStart = 0;
+    let targetWindowEnd = 0;
+    let hitWindowStart = 0;
+    let hitWindowEnd = 0;
+    const windowMs = rollingWindowSeconds * 1000;
+
+    const accuracySeries: SeriesPoint[] = [];
+    const hpsSeries: SeriesPoint[] = [];
+
+    for (let sec = 0; sec <= durationSeconds; sec += 1) {
+      const windowEnd = startTime + sec * 1000;
+      const windowStart = Math.max(startTime, windowEnd - windowMs);
+
+      while (targetWindowStart < targetFirstList.length && targetFirstList[targetWindowStart] < windowStart) targetWindowStart += 1;
+      while (targetWindowEnd < targetFirstList.length && targetFirstList[targetWindowEnd] <= windowEnd) targetWindowEnd += 1;
+      while (hitWindowStart < hitTimestamps.length && hitTimestamps[hitWindowStart] < windowStart) hitWindowStart += 1;
+      while (hitWindowEnd < hitTimestamps.length && hitTimestamps[hitWindowEnd] <= windowEnd) hitWindowEnd += 1;
+
+      const targetsInWindow = targetWindowEnd - targetWindowStart;
+      const hitsInWindow = hitWindowEnd - hitWindowStart;
+
+      accuracySeries.push({ time: sec, value: targetsInWindow ? (hitsInWindow / targetsInWindow) * 100 : null });
+      hpsSeries.push({ time: sec, value: hitsInWindow / rollingWindowSeconds });
+    }
+
+    return {
+      accuracySeries,
+      hpsSeries,
+      hitTimes: hitTimestamps.map(ts => (ts - startTime) / 1000),
+    };
+  }, [rollingWindowSeconds, sessionData]);
+
+  const velocityReaction = useMemo(() => {
+    if (!sessionData?.rawData.length) {
+      return { velocitySeries: [] as SeriesPoint[], reactionPoints: [] as SeriesPoint[], hitTimes: [] as number[] };
+    }
+
+    const sorted = [...sessionData.rawData].sort((a, b) => a.timestamp - b.timestamp);
+    const startTime = sorted[0].timestamp;
+    const endTime = sorted.at(-1)?.timestamp ?? startTime;
+    const durationSeconds = Math.max(sessionData.duration, Math.ceil((endTime - startTime) / 1000));
+
+    const velocityBuckets = new Map<number, { sum: number; count: number }>();
+    for (let i = 1; i < sorted.length; i += 1) {
+      const prev = sorted[i - 1];
+      const curr = sorted[i];
+      if (prev.mouseX === null || prev.mouseY === null || curr.mouseX === null || curr.mouseY === null) continue;
+      const deltaMs = curr.timestamp - prev.timestamp;
+      if (deltaMs <= 0) continue;
+      const distance = Math.hypot(curr.mouseX - prev.mouseX, curr.mouseY - prev.mouseY);
+      const speed = (distance / deltaMs) * 1000; // px per second
+      const bucket = Math.floor((curr.timestamp - startTime) / 1000);
+      const existing = velocityBuckets.get(bucket) ?? { sum: 0, count: 0 };
+      existing.sum += speed;
+      existing.count += 1;
+      velocityBuckets.set(bucket, existing);
+    }
+
+    const velocitySeries: SeriesPoint[] = [];
+    for (let sec = 0; sec <= durationSeconds; sec += 1) {
+      const bucket = velocityBuckets.get(sec);
+      velocitySeries.push({ time: sec, value: bucket && bucket.count ? bucket.sum / bucket.count : null });
+    }
+
+    const targetFirstSeen = new Map<string, number>();
+    const reactionPoints: SeriesPoint[] = [];
+    const hitTimes: number[] = [];
+
+    sorted.forEach(point => {
+      if (point.targetId && !targetFirstSeen.has(point.targetId)) {
+        targetFirstSeen.set(point.targetId, point.timestamp);
+      }
+      if (point.targetHit) {
+        hitTimes.push((point.timestamp - startTime) / 1000);
+        if (point.targetId) {
+          const firstSeen = targetFirstSeen.get(point.targetId);
+          if (firstSeen !== undefined && point.timestamp >= firstSeen) {
+            reactionPoints.push({ time: (point.timestamp - startTime) / 1000, value: point.timestamp - firstSeen });
+          }
+        }
+      }
+    });
+
+    return { velocitySeries, reactionPoints, hitTimes };
+  }, [sessionData]);
+
+  const rollingSeries = useMemo<SeriesConfig[]>(() => [
+    {
+      key: 'rolling-accuracy',
+      label: `Rolling Accuracy (${rollingWindowSeconds}s)`,
+      color: '#7c9bff',
+      gradientId: 'grad-rolling-acc',
+      points: rollingPerformance.accuracySeries,
+    },
+    {
+      key: 'rolling-hps',
+      label: 'Hits Per Second',
+      color: '#f1c40f',
+      gradientId: 'grad-rolling-hps',
+      points: rollingPerformance.hpsSeries,
+    },
+  ], [rollingPerformance.accuracySeries, rollingPerformance.hpsSeries, rollingWindowSeconds]);
+
+  const filteredRollingSeries = useMemo(() => {
+    return rollingSeries.filter(s => rollingVisibility[s.key]);
+  }, [rollingSeries, rollingVisibility]);
+
+  const velocitySeries = useMemo<SeriesConfig[]>(() => [
+    {
+      key: 'mouse-velocity',
+      label: 'Mouse Velocity (px/s)',
+      color: '#4ecdc4',
+      gradientId: 'grad-velocity',
+      points: velocityReaction.velocitySeries,
+    },
+    {
+      key: 'reaction-time',
+      label: 'Reaction Time (ms)',
+      color: '#ff6b6b',
+      gradientId: 'grad-reaction',
+      points: velocityReaction.reactionPoints,
+      fill: false,
+      showPoints: true,
+    },
+  ], [velocityReaction.reactionPoints, velocityReaction.velocitySeries]);
+
+  const filteredVelocitySeries = useMemo(() => {
+    return velocitySeries.filter(s => velocityVisibility[s.key]);
+  }, [velocitySeries, velocityVisibility]);
 
   // [Heatmap calculation logic remains same]
   const { heatmapPoints, baseScreenWidth, baseScreenHeight } = useMemo(() => {
@@ -547,12 +741,100 @@ const DetailedResultsPage = () => {
             </div>
             
             <div style={{ marginTop: '16px' }}>
-              <PerformanceLineChart 
-                series={filteredSeries} 
-                duration={sessionData.duration} 
-                hitTimes={hitTimes} 
+              <PerformanceLineChart
+                series={filteredSeries}
+                duration={sessionData.duration}
+                hitTimes={hitTimes}
                 zoomLevel={chartZoom}
                 showHitMarkers={visibleMetrics['hit-moment']}
+              />
+            </div>
+          </div>
+
+          <div className="viz-card detail-card bordered" style={{ padding: '20px' }}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px'}}>
+              <h3>Rolling Performance</h3>
+              <div className="visibility-controls" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {[{ key: 'rolling-accuracy', label: 'Rolling Accuracy', color: '#7c9bff' }, { key: 'rolling-hps', label: 'HPS', color: '#f1c40f' }, { key: 'rolling-hits', label: 'Hit markers', color: '#871212' }].map(({ key, label, color }) => (
+                  <button
+                    key={key}
+                    onClick={() => toggleRollingMetric(key)}
+                    style={{
+                      padding: '4px 12px',
+                      fontSize: '0.8rem',
+                      borderRadius: '16px',
+                      border: `1px solid ${color}`,
+                      backgroundColor: rollingVisibility[key] ? color : 'transparent',
+                      color: rollingVisibility[key] ? '#0b1021' : color,
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      transition: 'all 0.2s',
+                    }}
+                    aria-pressed={rollingVisibility[key]}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <ZoomControls
+                scale={rollingZoom}
+                onZoomIn={() => setRollingZoom(prev => Math.min(prev + 0.5, 4))}
+                onZoomOut={() => setRollingZoom(prev => Math.max(prev - 0.5, 1))}
+                onReset={() => setRollingZoom(1)}
+              />
+            </div>
+            <div style={{ marginTop: '16px' }}>
+              <PerformanceLineChart
+                series={filteredRollingSeries}
+                duration={sessionData.duration}
+                hitTimes={rollingVisibility['rolling-hits'] ? rollingPerformance.hitTimes : []}
+                zoomLevel={rollingZoom}
+                showHitMarkers={rollingVisibility['rolling-hits']}
+                yAxisLabel={`Last ${rollingWindowSeconds}s window`}
+              />
+            </div>
+          </div>
+
+          <div className="viz-card detail-card bordered" style={{ padding: '20px' }}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px'}}>
+              <h3>Velocity & Reaction</h3>
+              <div className="visibility-controls" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {[{ key: 'mouse-velocity', label: 'Mouse Velocity', color: '#4ecdc4' }, { key: 'reaction-time', label: 'Reaction Time', color: '#ff6b6b' }, { key: 'velocity-hits', label: 'Hit markers', color: '#871212' }].map(({ key, label, color }) => (
+                  <button
+                    key={key}
+                    onClick={() => toggleVelocityMetric(key)}
+                    style={{
+                      padding: '4px 12px',
+                      fontSize: '0.8rem',
+                      borderRadius: '16px',
+                      border: `1px solid ${color}`,
+                      backgroundColor: velocityVisibility[key] ? color : 'transparent',
+                      color: velocityVisibility[key] ? '#0b1021' : color,
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      transition: 'all 0.2s',
+                    }}
+                    aria-pressed={velocityVisibility[key]}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <ZoomControls
+                scale={velocityZoom}
+                onZoomIn={() => setVelocityZoom(prev => Math.min(prev + 0.5, 4))}
+                onZoomOut={() => setVelocityZoom(prev => Math.max(prev - 0.5, 1))}
+                onReset={() => setVelocityZoom(1)}
+              />
+            </div>
+            <div style={{ marginTop: '16px' }}>
+              <PerformanceLineChart
+                series={filteredVelocitySeries}
+                duration={sessionData.duration}
+                hitTimes={velocityVisibility['velocity-hits'] ? velocityReaction.hitTimes : []}
+                zoomLevel={velocityZoom}
+                showHitMarkers={velocityVisibility['velocity-hits']}
+                yAxisLabel="Speed (px/s) · Reaction (ms)"
               />
             </div>
           </div>
