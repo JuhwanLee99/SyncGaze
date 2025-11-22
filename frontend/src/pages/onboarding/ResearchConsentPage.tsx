@@ -88,13 +88,19 @@ const ResearchConsentPage = () => {
       <section className="privacy-callout">
         <h3>🔒 프라이버시 및 데이터 보호</h3>
         <p>
-          본 연구는 <b>WebGazer.js</b> 기술을 사용하여 브라우저 내에서만 작동합니다.<br />
-          귀하의 <b>웹캠 영상은 서버로 전송되거나 저장되지 않으며</b>, 오직 시선 좌표(x, y) 데이터만 추출하여 연구 목적으로 기록됩니다.
+            <br/>
+            <b>1. 웹캠 영상 비저장:</b> 본 연구는 WebGazer.js 기술을 사용하여 브라우저 내에서만 작동합니다. 
+            <b>귀하의 웹캠 영상은 서버로 전송되거나 저장되지 않으며, 오직 시선 좌표(x,y) 데이터만 추출하여 연구 목적으로 기록됩니다.</b>
+          </p>
+          <p style={{ marginTop: '10px' }}>
+            <b>2. 데이터 보안:</b> 모든 로그인 정보와 수집된 연구 데이터(설문조사, 시선 좌표, 게임 로그)는 <b>Google Firebase</b> 플랫폼을 통해 
+            익명화된 상태로 안전하게 저장되며, 연구 목적 외에는 사용되지 않습니다.
         </p>
       </section>
 
       <section className="consent-checklist">
         <h2>동의 항목</h2>
+        <br/>
         <label className="checkbox-label">
           <input type="checkbox" checked={agreements.webcam} onChange={handleToggle('webcam')} />
           <span>
