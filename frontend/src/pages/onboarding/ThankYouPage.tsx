@@ -8,6 +8,7 @@ const ThankYouPage = () => {
   const navigate = useNavigate();
   
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [feedback, setFeedback] = useState(''); // [추가됨] 건의사항 state
   const [isAgreed, setIsAgreed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -24,6 +25,7 @@ const ThankYouPage = () => {
   };
 
   const handleSubmitContact = async () => {
+    // 전화번호 필수 체크 (기존 로직 유지)
     if (!phoneNumber || phoneNumber.length < 10) {
       alert('올바른 전화번호를 입력해주세요.');
       return;
@@ -42,21 +44,18 @@ const ThankYouPage = () => {
     try {
       setIsSubmitting(true);
       
-      // [수정됨] 기존 'participants' 컬렉션 대신 'users' 컬렉션 사용
-      // 참고: trackingSessionContext.tsx의 saveSurveyAndConsent는 
-      // 'users/{uid}/consent/latest' 경로를 사용합니다.
-      // 이를 따라 기프티콘 정보도 'users/{uid}/gifticon/entry' 경로에 저장합니다.
-      
       const gifticonDocRef = doc(db, 'users', user.uid, 'gifticon', 'entry');
 
+      // [수정됨] feedback 필드 추가
       await setDoc(gifticonDocRef, {
         phoneNumber: phoneNumber,
+        feedback: feedback, // 건의사항 저장
         agreedToCollection: true,
         submittedAt: serverTimestamp(),
       }, { merge: true });
 
       setIsSubmitted(true);
-      alert('응모가 완료되었습니다! 감사합니다.');
+      alert('소중한 의견과 함께 응모가 완료되었습니다! 감사합니다.');
     } catch (error) {
       console.error('Failed to submit contact info:', error);
       alert('저장에 실패했습니다. 잠시 후 다시 시도해주세요.');
@@ -67,7 +66,6 @@ const ThankYouPage = () => {
 
   return (
     <div className="research-consent-page">
-      {/* 기존 UI 코드 유지 */}
       <div className="research-consent-card" style={{ textAlign: 'center' }}>
         <p className="eyebrow">Research Complete</p>
         <h1>참여해 주셔서 감사합니다</h1>
@@ -92,6 +90,34 @@ const ThankYouPage = () => {
               textAlign: 'left',
               marginTop: '20px'
             }}>
+              {/* [추가됨] 건의사항 입력 영역 */}
+              <div style={{ marginBottom: '20px' }}>
+                <label 
+                  htmlFor="feedback" 
+                  style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '0.9rem' }}
+                >
+                  궁금한 점이나 건의사항 (선택)
+                </label>
+                <textarea
+                  id="feedback"
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  placeholder="실험을 진행하면서 궁금했던 점이나 개선할 점이 있다면 자유롭게 적어주세요."
+                  style={{
+                    width: '100%',
+                    minHeight: '80px',
+                    padding: '12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ccc',
+                    backgroundColor: '#fff',
+                    color: '#333',
+                    fontSize: '1rem',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+
               <div style={{ marginBottom: '15px' }}>
                 <label 
                   htmlFor="phone" 
@@ -150,7 +176,7 @@ const ThankYouPage = () => {
             }}>
               <h3 style={{ color: '#4ade80', marginBottom: '5px' }}>✅ 응모 완료</h3>
               <p style={{ fontSize: '0.9rem', color: '#eee' }}>
-                전화번호가 안전하게 저장되었습니다.<br/>
+                소중한 의견과 전화번호가 안전하게 저장되었습니다.<br/>
                 당첨 시 문자로 안내드리겠습니다.
               </p>
             </div>
