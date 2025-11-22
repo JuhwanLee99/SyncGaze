@@ -482,13 +482,47 @@ const DetailedResultsPage = () => {
     const durationSeconds = Math.max(sessionData.duration, Math.ceil((endTime - startTime) / 1000));
 
     const velocityBuckets = new Map<number, { sum: number; count: number }>();
+    
     for (let i = 1; i < sorted.length; i += 1) {
       const prev = sorted[i - 1];
       const curr = sorted[i];
-      if (prev.mouseX === null || prev.mouseY === null || curr.mouseX === null || curr.mouseY === null) continue;
+      
       const deltaMs = curr.timestamp - prev.timestamp;
       if (deltaMs <= 0) continue;
-      const distance = Math.hypot(curr.mouseX - prev.mouseX, curr.mouseY - prev.mouseY);
+
+      // --- FPS Mouse Velocity Calculation Fix ---
+      // 1. Priority: Use raw 'movementX/Y' if available (Pointer Lock API standard)
+      // 2. Fallback: If mouse coordinates are center-locked (delta ~ 0) and target is tracked,
+      //    use Target Screen Displacement as a proxy for Camera Movement.
+      //    (Assuming stationary target in world -> Target moves on screen ONLY if camera moves)
+      // 3. Legacy: Use absolute mouse position delta (for 2D modes)
+      
+      let distance = 0;
+      
+      // Check for raw movement data (Need to cast if type doesn't explicitly have it yet)
+      // @ts-ignore - 'movementX' might not be in TrainingDataPoint type yet
+      if (curr.movementX !== undefined && curr.movementY !== undefined) {
+        // @ts-ignore
+        distance = Math.hypot(curr.movementX, curr.movementY);
+      } 
+      // Check if mouse is effectively static (FPS center lock) but Target moves
+      else if (
+        curr.mouseX !== null && prev.mouseX !== null &&
+        Math.abs(curr.mouseX - prev.mouseX) < 0.01 && // Mouse didn't move on screen
+        Math.abs(curr.mouseY! - prev.mouseY!) < 0.01 &&
+        curr.targetId === prev.targetId && // Same target (ignore respawn jumps)
+        curr.targetX !== null && prev.targetX !== null &&
+        curr.targetY !== null && prev.targetY !== null
+      ) {
+        // In FPS, if I aim RIGHT, the target moves LEFT on screen. 
+        // Magnitude of Target Screen Delta ≈ Magnitude of Camera Rotation (in pixels)
+        distance = Math.hypot(curr.targetX - prev.targetX, curr.targetY - prev.targetY);
+      }
+      // Standard 2D fallback
+      else if (curr.mouseX !== null && prev.mouseX !== null && curr.mouseY !== null && prev.mouseY !== null) {
+        distance = Math.hypot(curr.mouseX - prev.mouseX, curr.mouseY - prev.mouseY);
+      }
+
       const speed = (distance / deltaMs) * 1000; // px per second
       const bucket = Math.floor((curr.timestamp - startTime) / 1000);
       const existing = velocityBuckets.get(bucket) ?? { sum: 0, count: 0 };
