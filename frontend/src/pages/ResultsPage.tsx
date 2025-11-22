@@ -446,7 +446,7 @@ const ResultsPage = () => {
           모든 결과를 확인하셨나요? 아래 버튼을 눌러 연구 참여를 종료해 주세요.
         </p>
         <button 
-          onClick={() => navigate('/onboarding/thank-you')}
+          onClick={() => navigate('/thank-you')}
           style={{
             padding: '15px 40px',
             fontSize: '1rem',
