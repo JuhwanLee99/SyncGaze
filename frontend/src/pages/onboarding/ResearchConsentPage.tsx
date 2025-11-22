@@ -63,49 +63,63 @@ const ResearchConsentPage = () => {
   };
 
   return (
-    <div className="research-consent-page">
-      <div className="research-consent-card">
-        <p className="eyebrow">Research Briefing</p>
-        <h1>연구 소개 및 참여 동의</h1>
-        <p className="lead">
-          본 실험은 FPS 게임 플레이 중 시선-마우스 상관관계를 분석하여 실력 향상 모델을 구축하는 것을 목표로 합니다.
+  <div className="research-consent-page">
+    <div className="research-consent-card">
+      <p className="eyebrow">Research Briefing</p>
+      <h1>연구 참여 및 동의</h1>
+      <p className="lead">
+        본 연구는 <b>FPS 게이머의 시선(gaze)과 마우스(mouse) 움직임의 상관관계</b>를 분석하기 위해 진행됩니다.<br/>
+        귀하의 플레이 데이터는 차세대 게임 인터페이스 개발에 큰 도움이 됩니다.
+        <br/>SyncGaze는 게이머의 에이밍 실력을 향상시키는 모델을 개발하는 것을 목표로 합니다.
+      </p>
+
+      <section className="research-overview">
+        <h2>진행 순서 (약 5분 소요)</h2>
+        <ul>
+          <li>
+            <b>STEP 1. 세팅:</b> 기본 설문 및 시선 추적 보정 (Calibration)
+          </li>
+          <li>
+            <b>STEP 2. 플레이:</b> 화면에 나타나는 표적을 맞추는 미니 게임 진행
+          </li>
+        </ul>
+      </section>
+
+      <section className="privacy-callout">
+        <h3>🔒 프라이버시 및 데이터 보호</h3>
+        <p>
+          본 연구는 <b>WebGazer.js</b> 기술을 사용하여 브라우저 내에서만 작동합니다.<br />
+          귀하의 <b>웹캠 영상은 서버로 전송되거나 저장되지 않으며</b>, 오직 시선 좌표(x, y) 데이터만 추출하여 연구 목적으로 기록됩니다.
         </p>
+      </section>
 
-        <section className="research-overview">
-          <h2>연구 절차 요약</h2>
-          <ul>
-            <li>약 30분 동안 설문 → 캘리브레이션 → 표적 맞추기 과제를 진행합니다.</li>
-            <li>캘리브레이션 중 수집되는 데이터는 참가자 기기에서 WebGazer.js로 실시간 처리됩니다.</li>
-            <li>수집된 좌표와 입력 이벤트는 participant_id로 익명화되어 연구 목적으로만 사용됩니다.</li>
-          </ul>
-        </section>
-
-        <section className="privacy-callout">
-          <h3>WebGazer 기반 프라이버시 보호</h3>
-          <p>
-            얼굴 영상은 브라우저 내에서만 분석되며 서버로 전송되지 않습니다. 알고리즘이 추출한 시선 좌표(x, y)만이 저장됩니다.
-          </p>
-        </section>
-
-        <section className="consent-checklist">
-          <h2>동의 항목</h2>
-          <label>
-            <input type="checkbox" checked={agreements.webcam} onChange={handleToggle('webcam')} />
-            웹캠 접근 권한을 허용하며, 얼굴 및 눈의 특징점을 실시간으로 분석하는 것에 동의합니다.
-          </label>
-          <label>
-            <input type="checkbox" checked={agreements.video} onChange={handleToggle('video')} />
-            웹캠 원본 영상은 저장되지 않으며, 영상 전송 없이 로컬에서만 처리됨을 확인합니다.
-          </label>
-          <label>
-            <input type="checkbox" checked={agreements.data} onChange={handleToggle('data')} />
-            시선 좌표, 마우스/키보드 입력, 인게임 이벤트 로그가 연구 목적으로 저장되는 것에 동의합니다.
-          </label>
-          <label>
-            <input type="checkbox" checked={agreements.privacy} onChange={handleToggle('privacy')} />
-            모든 데이터가 익명화되며, 언제든지 참여 중단 및 동의 철회가 가능함을 이해했습니다.
-          </label>
-        </section>
+      <section className="consent-checklist">
+        <h2>동의 항목</h2>
+        <label className="checkbox-label">
+          <input type="checkbox" checked={agreements.webcam} onChange={handleToggle('webcam')} />
+          <span>
+            <b>[웹캠 접근]</b> 시선 추적을 위해 브라우저의 카메라 접근을 허용합니다.
+          </span>
+        </label>
+        <label className="checkbox-label">
+          <input type="checkbox" checked={agreements.video} onChange={handleToggle('video')} />
+          <span>
+            <b>[영상 보안]</b> 내 얼굴 영상이 서버에 저장되지 않고 내 컴퓨터에서만 처리됨을 이해했습니다.
+          </span>
+        </label>
+        <label className="checkbox-label">
+          <input type="checkbox" checked={agreements.data} onChange={handleToggle('data')} />
+          <span>
+            <b>[데이터 활용]</b> 익명화된 시선 좌표, 마우스 입력, 게임 로그가 연구 분석에 사용되는 것에 동의합니다.
+          </span>
+        </label>
+        <label className="checkbox-label">
+          <input type="checkbox" checked={agreements.privacy} onChange={handleToggle('privacy')} />
+          <span>
+            <b>[참여 권리]</b> 언제든지 참여를 중단하거나 동의를 철회할 수 있음을 확인했습니다.
+          </span>
+        </label>
+      </section>
 
         {(error || persistError) && (
           <div className="error-banner" role="alert">
@@ -131,6 +145,12 @@ const ResearchConsentPage = () => {
             설문 수정하기
           </button>
         </div>
+
+        {/* (Optional) 연구자 연락처 추가 권장 */}
+      <div className="researcher-contact" style={{marginTop: '25px', fontSize: '1rem', color: '#ffffffff', textAlign: 'center'}}>
+        <p>연구 관련 문의: syncgaze25@gmail.com</p>
+      </div>
+
       </div>
     </div>
   );
