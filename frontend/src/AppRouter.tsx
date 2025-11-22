@@ -26,7 +26,7 @@ const RouteLoader = () => (
 
 const ProtectedRoute = ({ children }: { children: ReactElement }) => {
   const location = useLocation();
-  const isAuthenticated = getIsAuthenticated();
+ 
   const { surveyResponses } = useTrackingSession();
   const { user, loading } = useAuth();
 
