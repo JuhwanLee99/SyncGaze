@@ -73,9 +73,9 @@ export const GameController = forwardRef<GameControllerRef, GameControllerProps>
       type: isMoving ? 'moving' : 'static',
       velocity: isMoving
         ? new THREE.Vector3(
-            (Math.random() - 0.5) * 0.24,
-            (Math.random() - 0.5) * 0.24,
-            (Math.random() - 0.5) * 0.24
+            (Math.random() - 0.5) * 0.20,
+            (Math.random() - 0.5) * 0.20,
+            (Math.random() - 0.5) * 0.20
           )
         : undefined
     };
