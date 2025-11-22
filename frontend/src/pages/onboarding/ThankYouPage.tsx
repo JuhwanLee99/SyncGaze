@@ -81,7 +81,7 @@ const ThankYouPage = () => {
           <h2>기프티콘 추첨 안내</h2>
           <p style={{ fontSize: '1.1rem', lineHeight: '1.6', marginBottom: '20px' }}>
             연구에 참여해 주신 분들 중<br />
-            <b>5명을 추첨하여 소정의 기프티콘</b>을 보내드립니다.
+            <b>10명을 추첨하여 소정의 기프티콘 (스타벅스 아이스 카페 아메리카노T) </b>을 보내드립니다.
           </p>
 
           {!isSubmitted ? (
