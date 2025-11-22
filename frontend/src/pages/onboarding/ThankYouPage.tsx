@@ -8,7 +8,7 @@ const ThankYouPage = () => {
   const navigate = useNavigate();
   
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [feedback, setFeedback] = useState(''); // [추가됨] 건의사항 state
+  const [feedback, setFeedback] = useState('');
   const [isAgreed, setIsAgreed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -24,8 +24,47 @@ const ThankYouPage = () => {
     }
   };
 
+  // 건의사항 입력 핸들러 (300자 제한)
+  const handleFeedbackChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    if (value.length <= 300) {
+      setFeedback(value);
+    }
+  };
+
+  // 건의사항만 별도로 전송하는 핸들러
+  const handleSubmitFeedbackOnly = async () => {
+    if (!feedback.trim()) {
+      alert('건의사항 내용을 입력해주세요.');
+      return;
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+      alert('로그인 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const gifticonDocRef = doc(db, 'users', user.uid, 'gifticon', 'entry');
+
+      await setDoc(gifticonDocRef, {
+        feedback: feedback,
+        feedbackSubmittedAt: serverTimestamp(),
+      }, { merge: true });
+
+      alert('소중한 의견 감사합니다! 건의사항이 성공적으로 전달되었습니다.');
+      setFeedback(''); 
+    } catch (error) {
+      console.error('Failed to submit feedback:', error);
+      alert('전송에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmitContact = async () => {
-    // 전화번호 필수 체크 (기존 로직 유지)
     if (!phoneNumber || phoneNumber.length < 10) {
       alert('올바른 전화번호를 입력해주세요.');
       return;
@@ -46,10 +85,9 @@ const ThankYouPage = () => {
       
       const gifticonDocRef = doc(db, 'users', user.uid, 'gifticon', 'entry');
 
-      // [수정됨] feedback 필드 추가
       await setDoc(gifticonDocRef, {
         phoneNumber: phoneNumber,
-        feedback: feedback, // 건의사항 저장
+        feedback: feedback,
         agreedToCollection: true,
         submittedAt: serverTimestamp(),
       }, { merge: true });
@@ -90,19 +128,26 @@ const ThankYouPage = () => {
               textAlign: 'left',
               marginTop: '20px'
             }}>
-              {/* [추가됨] 건의사항 입력 영역 */}
+              {/* 건의사항 입력 영역 */}
               <div style={{ marginBottom: '20px' }}>
-                <label 
-                  htmlFor="feedback" 
-                  style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '0.9rem' }}
-                >
-                  궁금한 점이나 건의사항 (선택)
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+                  <label 
+                    htmlFor="feedback" 
+                    style={{ fontWeight: 'bold', fontSize: '0.9rem' }}
+                  >
+                    궁금한 점이나 건의사항 (선택)
+                  </label>
+                  {/* 글자 수 카운터 */}
+                  <span style={{ fontSize: '0.8rem', color: feedback.length === 300 ? '#ff6b6b' : '#aaa' }}>
+                    {feedback.length} / 300
+                  </span>
+                </div>
                 <textarea
                   id="feedback"
                   value={feedback}
-                  onChange={(e) => setFeedback(e.target.value)}
-                  placeholder="실험을 진행하면서 궁금했던 점이나 개선할 점이 있다면 자유롭게 적어주세요."
+                  onChange={handleFeedbackChange}
+                  maxLength={300} // 최대 글자 수 제한
+                  placeholder="실험을 진행하면서 궁금했던 점이나 개선할 점이 있다면 자유롭게 적어주세요. (최대 300자)"
                   style={{
                     width: '100%',
                     minHeight: '80px',
@@ -116,9 +161,31 @@ const ThankYouPage = () => {
                     fontFamily: 'inherit'
                   }}
                 />
+                
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={handleSubmitFeedbackOnly}
+                    disabled={isSubmitting || !feedback.trim()}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '0.85rem',
+                      borderRadius: '4px',
+                      border: '1px solid #666',
+                      backgroundColor: 'transparent',
+                      color: '#ddd',
+                      cursor: isSubmitting || !feedback.trim() ? 'not-allowed' : 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
+                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    건의사항만 보내기
+                  </button>
+                </div>
               </div>
 
-              <div style={{ marginBottom: '15px' }}>
+              <div style={{ marginBottom: '15px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px' }}>
                 <label 
                   htmlFor="phone" 
                   style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '0.9rem' }}
