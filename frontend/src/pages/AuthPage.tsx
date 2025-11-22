@@ -201,10 +201,10 @@ const AuthPage = () => {
         <div className="auth-form-container">
           <div className="auth-form-wrapper">
             <div className="form-header">
-              <h2>{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
+              <h2>{isLogin ? 'Welcome!' : 'Create Account'}</h2>
               <p>
                 {isLogin 
-                  ? 'Sign in to continue your training' 
+                  ? 'Sign in to start training with SyncGaze' 
                   : 'Start your journey to better aim'}
               </p>
             </div>

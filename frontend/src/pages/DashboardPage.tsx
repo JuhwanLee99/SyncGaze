@@ -7,8 +7,10 @@ import { useAuth } from '../state/authContext';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const { recentSessions, setActiveSessionId, calibrationResult, resetState } = useTrackingSession();
+  const { recentSessions, setActiveSessionId, calibrationResult, resetState, isAnonymousSession } = useTrackingSession();
   const { user, signOut: signOutUser } = useAuth();
+  const hasRealSession = recentSessions.some(session => !session.id.startsWith('mock-'));
+  const isNewUser = isAnonymousSession || !hasRealSession;
 
   const handleLogout = async () => {
     try {
@@ -94,8 +96,12 @@ const DashboardPage = () => {
       <main className="dashboard-main">
         {/* Welcome Section */}
         <section className="welcome-section">
-          <h2>Welcome back!</h2>
-          <p>Track your progress and start a new training session</p>
+          <h2>{isNewUser ? 'Welcome to SyncGaze!' : 'Welcome back!'}</h2>
+          <p>
+            {isNewUser
+              ? 'Calibrate and start your first training session.'
+              : 'Track your progress and start a new training session.'}
+          </p>
         </section>
 
         {/* Quick Stats */}
