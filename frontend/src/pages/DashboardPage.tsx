@@ -7,8 +7,10 @@ import { useAuth } from '../state/authContext';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const { recentSessions, setActiveSessionId, calibrationResult, resetState } = useTrackingSession();
+  const { recentSessions, setActiveSessionId, calibrationResult, resetState, isAnonymousSession } = useTrackingSession();
   const { user, signOut: signOutUser } = useAuth();
+  const hasRealSession = recentSessions.some(session => !session.id.startsWith('mock-'));
+  const isNewUser = isAnonymousSession || !hasRealSession;
 
   const handleLogout = async () => {
     try {
@@ -48,7 +50,7 @@ const DashboardPage = () => {
       totalSessions,
       avgAccuracy: Number(avgAccuracy.toFixed(1)),
       bestAccuracy: Number(bestAccuracy.toFixed(1)),
-      avgReactionTime: Number(avgReactionTime.toFixed(0)),
+      avgReactionTime: Number(avgReactionTime.toFixed(2)),
     };
   }, [recentSessions]);
 
@@ -190,7 +192,7 @@ const DashboardPage = () => {
                       <td>
                         {session.targetsHit}/{session.totalTargets}
                       </td>
-                      <td>{session.avgReactionTime}ms</td>
+                      <td>{session.avgReactionTime.toFixed(2)}ms</td>
                       <td className="table-actions">
                         <button className="view-button" onClick={() => handleViewResults(session.id)}>
                           View Details
