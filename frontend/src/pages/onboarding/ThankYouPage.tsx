@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore'; // Firestore 함수 임포트
-import { db, auth } from '../../lib/firebase'; // firebase 설정 임포트
-import './ResearchConsentPage.css'; // 기존 CSS 재사용
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db, auth } from '../../lib/firebase';
+import './ResearchConsentPage.css';
 
 const ThankYouPage = () => {
   const navigate = useNavigate();
   
-  // 입력 폼 상태 관리
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isAgreed, setIsAgreed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -17,7 +16,6 @@ const ThankYouPage = () => {
     navigate('/');
   };
 
-  // 전화번호 포맷팅 (010-1234-5678)
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9]/g, '');
     if (value.length <= 11) {
@@ -25,7 +23,6 @@ const ThankYouPage = () => {
     }
   };
 
-  // 데이터 전송 핸들러
   const handleSubmitContact = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
       alert('올바른 전화번호를 입력해주세요.');
@@ -45,14 +42,17 @@ const ThankYouPage = () => {
     try {
       setIsSubmitting(true);
       
-      // Firestore의 'participants' (또는 users) 컬렉션에 정보 저장
-      // merge: true 옵션을 사용하여 기존 설문 데이터가 있다면 유지하고 전화번호만 추가
-      await setDoc(doc(db, 'participants', user.uid), {
-        gifticonInfo: {
-          phoneNumber: phoneNumber,
-          agreedToCollection: true,
-          submittedAt: serverTimestamp(),
-        }
+      // [수정됨] 기존 'participants' 컬렉션 대신 'users' 컬렉션 사용
+      // 참고: trackingSessionContext.tsx의 saveSurveyAndConsent는 
+      // 'users/{uid}/consent/latest' 경로를 사용합니다.
+      // 이를 따라 기프티콘 정보도 'users/{uid}/gifticon/entry' 경로에 저장합니다.
+      
+      const gifticonDocRef = doc(db, 'users', user.uid, 'gifticon', 'entry');
+
+      await setDoc(gifticonDocRef, {
+        phoneNumber: phoneNumber,
+        agreedToCollection: true,
+        submittedAt: serverTimestamp(),
       }, { merge: true });
 
       setIsSubmitted(true);
@@ -67,6 +67,7 @@ const ThankYouPage = () => {
 
   return (
     <div className="research-consent-page">
+      {/* 기존 UI 코드 유지 */}
       <div className="research-consent-card" style={{ textAlign: 'center' }}>
         <p className="eyebrow">Research Complete</p>
         <h1>참여해 주셔서 감사합니다</h1>
@@ -83,7 +84,6 @@ const ThankYouPage = () => {
             <b>5명을 추첨하여 소정의 기프티콘</b>을 보내드립니다.
           </p>
 
-          {/* 응모 완료 전: 입력 폼 표시 */}
           {!isSubmitted ? (
             <div className="contact-form" style={{ 
               backgroundColor: 'rgba(255, 255, 255, 0.05)', 
@@ -141,7 +141,6 @@ const ThankYouPage = () => {
               </button>
             </div>
           ) : (
-            /* 응모 완료 후: 메시지 표시 */
             <div style={{ 
               padding: '20px', 
               backgroundColor: 'rgba(34, 197, 94, 0.1)', 
