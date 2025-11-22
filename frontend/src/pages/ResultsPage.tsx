@@ -4,23 +4,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './ResultsPage.css';
-import {
-  TrainingSessionSummary,
-  useTrackingSession,
-} from '../state/trackingSessionContext';
+import { TrainingSessionSummary, useTrackingSession } from '../state/trackingSessionContext';
 import { exportSessionData } from '../utils/sessionExport';
 import { useWebgazer } from '../hooks/tracking/useWebgazer';  // NEW: Import useWebgazer
 import { useAuth } from '../state/authContext';
 import { persistLatestSession } from '../utils/resultsStorage';
-
-interface Analytics {
-  totalTargets: number;
-  targetsHit: number;
-  accuracy: number;
-  avgReactionTime: number;
-  gazeAccuracy: number;
-  mouseAccuracy: number;
-}
 import { calculatePerformanceAnalytics, PerformanceAnalytics } from '../utils/analytics';
 
 type AutoUploadStatus = 'idle' | 'success' | 'error' | 'skipped';
@@ -68,6 +56,7 @@ const ResultsPage = () => {
   const { user } = useAuth();
   const [sessionData, setSessionData] = useState<TrainingSessionSummary | null>(activeSession);
   const [analytics, setAnalytics] = useState<PerformanceAnalytics | null>(null);
+  const [missingRawData, setMissingRawData] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [autoUploadAttemptedFor, setAutoUploadAttemptedFor] = useState<string | null>(null);
   const [autoUploadStatus, setAutoUploadStatus] = useState<AutoUploadStatus>('idle');
@@ -75,6 +64,7 @@ const ResultsPage = () => {
   const toastTimeoutRef = useRef<number | null>(null);
   const participantLabel = user?.email ?? user?.displayName ?? user?.uid;
   const locationState = (location.state as { fromTrainingComplete?: boolean; sessionId?: string } | null) ?? null;
+  const isCalibrationValidated = calibrationResult?.status === 'validated';
 
   // NEW: Stop WebGazer when results page mounts
   useEffect(() => {
@@ -88,48 +78,24 @@ const ResultsPage = () => {
       return;
     }
     setSessionData(activeSession);
-    setAnalytics(calculatePerformanceAnalytics(activeSession.rawData));
+    if (activeSession.rawData && activeSession.rawData.length > 0) {
+      setMissingRawData(false);
+      setAnalytics(calculatePerformanceAnalytics(activeSession.rawData));
+    } else {
+      // Fallback to stored summary when raw data is missing
+      setMissingRawData(true);
+      setAnalytics({
+        totalTargets: activeSession.totalTargets,
+        targetsHit: activeSession.targetsHit,
+        accuracy: activeSession.accuracy,
+        avgReactionTime: activeSession.avgReactionTime,
+        gazeAccuracy: activeSession.gazeAccuracy,
+        mouseAccuracy: activeSession.mouseAccuracy,
+      });
+    }
     setAutoUploadAttemptedFor(null);
     setAutoUploadStatus(loadStoredUploadStatus(activeSession.id) ?? 'idle');
   }, [activeSession, navigate]);
-
-  const calculateAnalytics = (data: TrainingDataPoint[]): Analytics => {
-    if (data.length === 0) {
-      return {
-        totalTargets: 0,
-        targetsHit: 0,
-        accuracy: 0,
-        avgReactionTime: 0,
-        gazeAccuracy: 0,
-        mouseAccuracy: 0,
-      };
-    }
-
-    const hits = data.filter(d => d.targetHit);
-    const totalTargets = data.filter(d => d.targetId !== null).length || hits.length;
-    const targetsHit = hits.length;
-
-    const reactionTimes = hits.map(d => d.timestamp);
-    const avgReactionTime = reactionTimes.length > 0
-      ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length
-      : 0;
-
-    const dataWithGaze = data.filter(d => d.gazeX !== null && d.gazeY !== null);
-    const dataWithMouse = data.filter(d => d.mouseX !== null && d.mouseY !== null);
-
-    const gazeAccuracy = (dataWithGaze.length / data.length) * 100;
-    const mouseAccuracy = (dataWithMouse.length / data.length) * 100;
-    const accuracy = totalTargets > 0 ? (targetsHit / totalTargets) * 100 : 0;
-
-    return {
-      totalTargets,
-      targetsHit,
-      accuracy,
-      avgReactionTime,
-      gazeAccuracy,
-      mouseAccuracy,
-    };
-  };
 
   useEffect(() => {
     if (!sessionData) {
@@ -281,6 +247,14 @@ const ResultsPage = () => {
 
       {/* Main Content */}
       <main className="results-main">
+        {(!isCalibrationValidated || missingRawData) && (
+          <div className="alert-banner warning" role="alert">
+            {!isCalibrationValidated
+              ? '캘리브레이션이 완료되지 않아 정확도가 낮을 수 있습니다. 다시 캘리브레이션 후 측정해 보세요.'
+              : '원시 데이터가 비어 있어 요약값으로 표시 중입니다. 트레이닝을 다시 실행해 주세요.'}
+          </div>
+        )}
+
         {/* Key Metrics */}
         <section className="metrics-section">
           <h2>Performance Overview</h2>

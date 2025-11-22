@@ -48,7 +48,7 @@ const DashboardPage = () => {
       totalSessions,
       avgAccuracy: Number(avgAccuracy.toFixed(1)),
       bestAccuracy: Number(bestAccuracy.toFixed(1)),
-      avgReactionTime: Number(avgReactionTime.toFixed(0)),
+      avgReactionTime: Number(avgReactionTime.toFixed(2)),
     };
   }, [recentSessions]);
 
@@ -183,7 +183,7 @@ const DashboardPage = () => {
                       <td>
                         {session.targetsHit}/{session.totalTargets}
                       </td>
-                      <td>{session.avgReactionTime}ms</td>
+                      <td>{session.avgReactionTime.toFixed(2)}ms</td>
                       <td className="table-actions">
                         <button className="view-button" onClick={() => handleViewResults(session.id)}>
                           View Details

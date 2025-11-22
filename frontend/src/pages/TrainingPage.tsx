@@ -73,7 +73,16 @@ const TrainingPage = () => {
     const convertedData = convertTrainingData(rawTrackingData);
 
     // Calculate metrics from the collected data
-    const metrics = calculatePerformanceAnalytics(convertedData);
+    const metrics = convertedData.length > 0
+      ? calculatePerformanceAnalytics(convertedData)
+      : {
+          accuracy: 0,
+          avgReactionTime: 0,
+          gazeAccuracy: 0,
+          mouseAccuracy: 0,
+          totalTargets: 0,
+          targetsHit: 0,
+        };
     
     // Create the session record with actual data
     const sessionRecord: TrainingSessionSummary = {
@@ -82,8 +91,8 @@ const TrainingPage = () => {
       duration: 60,
       score: score,
       accuracy: metrics.accuracy,
-      targetsHit: metrics.targetsHit,
-      totalTargets: metrics.totalTargets,
+      targetsHit: metrics.targetsHit || score,
+      totalTargets: metrics.totalTargets || metrics.targetsHit || score,
       avgReactionTime: metrics.avgReactionTime,
       gazeAccuracy: metrics.gazeAccuracy,
       mouseAccuracy: metrics.mouseAccuracy,
@@ -91,7 +100,7 @@ const TrainingPage = () => {
         width: window.innerWidth,
         height: window.innerHeight
       },
-      rawData: convertedData, // Now includes actual collected data
+      rawData: convertedData, // Now includes actual collected data (may be empty if collection failed)
       csvData: '', // Will be set below
     };
 

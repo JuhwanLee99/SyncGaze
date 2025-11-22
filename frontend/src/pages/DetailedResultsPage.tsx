@@ -207,10 +207,12 @@ const DetailedResultsPage = () => {
           </p>
         </div>
         <div className="header-actions">
-          {calibration?.validationError !== null && (
+          {calibration?.validationError !== null ? (
             <div className="pill">
               Calibration error: {calibration.validationError?.toFixed(1)} px
             </div>
+          ) : (
+            <div className="pill warning">Calibration not completed</div>
           )}
           <button type="button" className="detail-button ghost" onClick={handleBack}>
             Back to results
