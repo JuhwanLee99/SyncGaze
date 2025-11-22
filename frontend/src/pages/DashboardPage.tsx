@@ -68,6 +68,9 @@ const DashboardPage = () => {
     return 'Calibration pending.';
   }, [calibrationResult]);
 
+  // ✅ NEW: Conditional welcome message based on session history
+  const isFirstTime = recentSessions.length === 0;
+
   return (
     <div className="dashboard-page">
       {/* Header */}
@@ -92,10 +95,14 @@ const DashboardPage = () => {
 
       {/* Main Content */}
       <main className="dashboard-main">
-        {/* Welcome Section */}
+        {/* Welcome Section - ✅ NOW CONDITIONAL */}
         <section className="welcome-section">
-          <h2>Welcome back!</h2>
-          <p>Track your progress and start a new training session</p>
+          <h2>{isFirstTime ? 'Welcome to SyncGaze!' : 'Welcome back!'}</h2>
+          <p>
+            {isFirstTime 
+              ? 'Start your first training session to track your eye-tracking performance' 
+              : 'Track your progress and start a new training session'}
+          </p>
         </section>
 
         {/* Quick Stats */}
