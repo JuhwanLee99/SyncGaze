@@ -301,7 +301,6 @@ const ResultsPage = () => {
   const heatmapCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const heatmapContainerRef = useRef<HTMLDivElement | null>(null);
   const participantLabel = user?.email ?? user?.displayName ?? user?.uid;
-  const locationState = (location.state as { fromTrainingComplete?: boolean; sessionId?: string } | null) ?? null;
   const isCalibrationValidated = calibrationResult?.status === 'validated';
 
   // --- NEW: Performance Series Data Generation ---
@@ -497,26 +496,6 @@ const ResultsPage = () => {
         }
       }
   }, [sessionToDisplay, navigate, sessionData, activeSession, setActiveSessionId]);
-  
-    setSessionData(activeSession);
-    if (activeSession.rawData && activeSession.rawData.length > 0) {
-      setMissingRawData(false);
-      setAnalytics(calculatePerformanceAnalytics(activeSession.rawData));
-    } else {
-      // Fallback to stored summary when raw data is missing
-      setMissingRawData(true);
-      setAnalytics({
-        totalTargets: activeSession.totalTargets,
-        targetsHit: activeSession.targetsHit,
-        accuracy: activeSession.accuracy,
-        avgReactionTime: activeSession.avgReactionTime,
-        gazeAccuracy: activeSession.gazeAccuracy,
-        mouseAccuracy: activeSession.mouseAccuracy,
-      });
-    }
-    setAutoUploadAttemptedFor(null);
-    setAutoUploadStatus(loadStoredUploadStatus(activeSession.id) ?? 'idle');
-  }, [activeSession, navigate]);
 
   useEffect(() => {
     if (!sessionData) {
