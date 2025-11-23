@@ -295,7 +295,11 @@ const ResultsPage = () => {
   const [missingRawData, setMissingRawData] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [autoUploadAttemptedFor, setAutoUploadAttemptedFor] = useState<string | null>(null);
-  const [autoUploadStatus, setAutoUploadStatus] = useState<AutoUploadStatus>('idle');
+  // 초기화 시점에 바로 sessionStorage를 확인하여 상태를 설정합니다. - csv 수동 업로드 버튼 재활성화 방지
+  const [autoUploadStatus, setAutoUploadStatus] = useState<AutoUploadStatus>(() => {
+    // sessionToDisplay가 있다면 해당 ID에 대한 저장된 상태를 불러오고, 없으면 'idle'
+    return loadStoredUploadStatus(sessionToDisplay?.id) ?? 'idle';
+  });
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
   const heatmapCanvasRef = useRef<HTMLCanvasElement | null>(null);
