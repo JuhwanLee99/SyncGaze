@@ -20,8 +20,17 @@ app.use(cors({ origin: true }));
 
 // 라우트 설정
 // 기존 backend/src/server.js의 설정을 그대로 가져옵니다.
-app.use('/api/upload-csv', express.text({ type: '*/*', limit: '10mb' }), uploadCsvRoute);
+app.use('/api/upload-csv', express.text({ type: '*/*', limit: '1mb' }), uploadCsvRoute);
 app.use('/api/submit-survey', express.json({ limit: '1mb' }), submitSurveyRoute);
+
+app.use((req, res) => {
+  res.status(404).json({ message: 'Not Found' });
+});
+
+app.use((err, req, res, next) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+  console.error('Unexpected server error:', err);
+  res.status(500).json({ message: 'Internal server error' });
+});
 
 // Firebase Cloud Function으로 내보내기
 export const api = functions.https.onRequest(app);
